@@ -1,3 +1,4 @@
+.gitignore
 key/
 *.json
 .env
