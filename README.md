@@ -1,14 +1,15 @@
 # Pocket Atlas — AI Travel Planner
 
-> Pocket Atlas is a small AI-powered travel itinerary generator. Give it a destination, dates and preferences; the app calls Gemini to generate a day-by-day plan and enriches places with Google Places details (addresses, photos, map links).
+> Pocket Atlas is a small AI-powered travel itinerary generator. Give it a destination, dates and preferences; the app calls Gemini to generate a day-by-day plan and enriches places with TrackAsia geocoding API (addresses, coordinates, map links).
 
-This repository contains a Next.js frontend and a FastAPI backend that orchestrates calls to Gemini and Google Places.
+This repository contains a Next.js frontend and a FastAPI backend that orchestrates calls to Gemini and TrackAsia.
 
 ## Key features
 - Generate multi-day, day-by-day itineraries
 - Use Gemini (Generative AI) to draft realistic activities
-- Enrich each place with Google Places (address, rating, photo, coordinates)
+- Enrich each place with TrackAsia API (address, coordinates, location types)
 - Simple interactive UI to view and edit the generated plan
+- Drag & drop to reorder activities with automatic time recalculation
 
 ## Project structure (important files)
 - `frontend/` — Next.js app (pages in `frontend/app`, styles in `frontend/app/globals.css`)

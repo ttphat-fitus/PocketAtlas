@@ -1,8 +1,3 @@
-"""
-Pocket Atlas - AI Travel Planner Backend
-Specialized API for creating personalized travel itineraries using Gemini AI and Google Places API
-"""
-
 import google.generativeai as genai
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -15,7 +10,7 @@ import requests
 from typing import Optional
 
 GOOGLE_API_KEY = json.load(open("key/chatbot_key.json"))["GOOGLE_API_KEY"]
-PLACES_API_KEY = json.load(open("key/places_key.json"))["GOOGLE_PLACES_API"]
+TRACKASIA_API_KEY = json.load(open("key/places_key.json"))["TRACK_ASIA_KEY"]
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
@@ -63,14 +58,7 @@ class TripRequest(BaseModel):
 
 # ============== Helper Functions ==============
 def get_place_details(place_name: str, location: str) -> dict:
-    """
-    Fetch detailed information about a place using multiple Google Places strategies
-    - Sanitize AI-generated place names (remove examples, parentheses)
-    - Try Text Search → Find Place → Geocoding as fallback
-    - Return structured details with address, coordinates, photos, ratings
-    """
     def sanitize(s: str) -> str:
-        """Remove examples (VD:), parentheses, special chars from AI-generated names"""
         if not s:
             return ""
         # Remove example markers like "(VD: Restaurant Name)"
@@ -97,133 +85,113 @@ def get_place_details(place_name: str, location: str) -> dict:
         
         headers = {"User-Agent": "PocketAtlas/1.0"}
         
-        # Strategy 1: Text Search (best for landmarks, restaurants)
+        # Strategy 1: TrackAsia Search API (best for landmarks, restaurants)
         for query in queries:
             if not query:
                 continue
             
-            search_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+            # TrackAsia Search API endpoint (v2 - compatible with Google Places format)
+            search_url = "https://maps.track-asia.com/api/v2/place/textsearch/json"
             search_params = {
                 "query": query,
-                "key": PLACES_API_KEY,
+                "key": TRACKASIA_API_KEY,
                 "language": "vi"
             }
             
             resp = requests.get(search_url, params=search_params, timeout=10, headers=headers)
             data = resp.json()
             
-            print(f"      → TextSearch '{query[:50]}...' → {len(data.get('results', []))} results")
+            results = data.get("results", [])
+            print(f"      → TrackAsia Search '{query[:50]}...' → {len(results)} results")
             
-            if data.get("results") and len(data["results"]) > 0:
-                place = data["results"][0]
-                place_id = place.get("place_id")
+            if results and len(results) > 0:
+                place = results[0]
                 
-                # Fetch detailed information
-                details_url = "https://maps.googleapis.com/maps/api/place/details/json"
-                details_params = {
-                    "place_id": place_id,
-                    "fields": "name,formatted_address,rating,user_ratings_total,photos,geometry,types,price_level",
-                    "key": PLACES_API_KEY,
-                    "language": "vi"
-                }
-                
-                dresp = requests.get(details_url, params=details_params, timeout=10, headers=headers)
-                ddata = dresp.json().get("result", {})
-                
-                if ddata:
-                    photo_url = ""
-                    if ddata.get("photos") and len(ddata["photos"]) > 0:
-                        pr = ddata["photos"][0].get("photo_reference")
-                        if pr:
-                            photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference={pr}&key={PLACES_API_KEY}"
-                    
-                    return {
-                        "name": ddata.get("name", place_name),
-                        "address": ddata.get("formatted_address", ""),
-                        "rating": ddata.get("rating", 0),
-                        "total_ratings": ddata.get("user_ratings_total", 0),
-                        "photo_url": photo_url,
-                        "lat": ddata.get("geometry", {}).get("location", {}).get("lat", 0),
-                        "lng": ddata.get("geometry", {}).get("location", {}).get("lng", 0),
-                        "types": ddata.get("types", []),
-                        "price_level": ddata.get("price_level", 0)
-                    }
-        
-        # Strategy 2: Find Place From Text (more forgiving, good for generic names)
-        find_url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
-        find_params = {
-            "input": f"{q} {location}".strip(),
-            "inputtype": "textquery",
-            "fields": "place_id,formatted_address,name,geometry",
-            "key": PLACES_API_KEY,
-            "language": "vi"
-        }
-        
-        fresp = requests.get(find_url, params=find_params, timeout=8, headers=headers)
-        fdata = fresp.json()
-        
-        print(f"      → FindPlace → {len(fdata.get('candidates', []))} candidates")
-        
-        if fdata.get("candidates"):
-            cand = fdata["candidates"][0]
-            place_id = cand.get("place_id")
-            
-            # Get full details
-            details_url = "https://maps.googleapis.com/maps/api/place/details/json"
-            details_params = {
-                "place_id": place_id,
-                "fields": "name,formatted_address,rating,user_ratings_total,photos,geometry,types,price_level",
-                "key": PLACES_API_KEY,
-                "language": "vi"
-            }
-            
-            dresp = requests.get(details_url, params=details_params, timeout=10, headers=headers)
-            ddata = dresp.json().get("result", {})
-            
-            if ddata:
-                photo_url = ""
-                if ddata.get("photos") and len(ddata["photos"]) > 0:
-                    pr = ddata["photos"][0].get("photo_reference")
-                    if pr:
-                        photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference={pr}&key={PLACES_API_KEY}"
+                # TrackAsia v2 follows Google Places API format
+                # Extract basic info (no photos/ratings in free tier)
+                geometry = place.get("geometry", {})
+                location = geometry.get("location", {})
                 
                 return {
-                    "name": ddata.get("name", place_name),
-                    "address": ddata.get("formatted_address", ""),
-                    "rating": ddata.get("rating", 0),
-                    "total_ratings": ddata.get("user_ratings_total", 0),
-                    "photo_url": photo_url,
-                    "lat": ddata.get("geometry", {}).get("location", {}).get("lat", 0),
-                    "lng": ddata.get("geometry", {}).get("location", {}).get("lng", 0),
-                    "types": ddata.get("types", []),
-                    "price_level": ddata.get("price_level", 0)
+                    "name": place.get("name", place_name),
+                    "address": place.get("formatted_address", ""),
+                    "rating": place.get("rating", 0),  # May be 0 in free tier
+                    "total_ratings": place.get("user_ratings_total", 0),
+                    "photo_url": "",  # TrackAsia free tier doesn't include photos
+                    "lat": float(location.get("lat", 0)),
+                    "lng": float(location.get("lng", 0)),
+                    "types": place.get("types", []),
+                    "price_level": place.get("price_level", 0)
                 }
         
-        # Strategy 3: Geocoding (fallback for area names or when specific place not found)
-        geo_url = "https://maps.googleapis.com/maps/api/geocode/json"
-        geo_params = {
-            "address": f"{q} {location}".strip(),
-            "key": PLACES_API_KEY,
+        # Strategy 2: TrackAsia Nearby Search (fallback for generic location queries)
+        nearby_url = "https://maps.track-asia.com/api/v2/place/textsearch/json"
+        nearby_params = {
+            "query": f"{q} {location}".strip(),
+            "key": TRACKASIA_API_KEY,
             "language": "vi"
         }
         
-        gresp = requests.get(geo_url, params=geo_params, timeout=8, headers=headers)
+        fresp = requests.get(nearby_url, params=nearby_params, timeout=8, headers=headers)
+        fdata = fresp.json()
+        
+        fresults = fdata.get("results", [])
+        print(f"      → TrackAsia Nearby Search → {len(fresults)} results")
+        
+        if fresults and len(fresults) > 0:
+            # Try to find best match
+            best_match = None
+            for result in fresults:
+                if q.lower() in result.get("name", "").lower():
+                    best_match = result
+                    break
+            
+            if not best_match:
+                best_match = fresults[0]
+            
+            geometry = best_match.get("geometry", {})
+            location_data = geometry.get("location", {})
+            
+            return {
+                "name": best_match.get("name", place_name),
+                "address": best_match.get("formatted_address", ""),
+                "rating": best_match.get("rating", 0),
+                "total_ratings": best_match.get("user_ratings_total", 0),
+                "photo_url": "",
+                "lat": float(location_data.get("lat", 0)),
+                "lng": float(location_data.get("lng", 0)),
+                "types": best_match.get("types", []),
+                "price_level": best_match.get("price_level", 0)
+            }
+        
+        # Strategy 3: TrackAsia Autocomplete (last resort for partial matches)
+        autocomplete_url = "https://maps.track-asia.com/api/v2/place/autocomplete/json"
+        autocomplete_params = {
+            "input": f"{q} {location}".strip(),
+            "key": TRACKASIA_API_KEY,
+            "language": "vi"
+        }
+        
+        gresp = requests.get(autocomplete_url, params=autocomplete_params, timeout=8, headers=headers)
         gdata = gresp.json()
         
-        print(f"      → Geocode → {len(gdata.get('results', []))} results")
+        predictions = gdata.get("predictions", [])
+        print(f"      → TrackAsia Autocomplete → {len(predictions)} predictions")
         
-        if gdata.get("results"):
-            res = gdata["results"][0]
-            loc = res.get("geometry", {}).get("location", {})
+        if predictions and len(predictions) > 0:
+            # Use first prediction
+            pred = predictions[0]
+            # Note: autocomplete doesn't return full coordinates, just description
+            # Return basic info with name only
             return {
-                "name": place_name,
-                "address": res.get("formatted_address", ""),
+                "name": pred.get("description", place_name).split(",")[0].strip(),
+                "address": pred.get("description", ""),
                 "rating": 0,
                 "total_ratings": 0,
                 "photo_url": "",
-                "lat": loc.get("lat", 0),
-                "lng": loc.get("lng", 0),
-                "types": res.get("types", []),
+                "lat": 0,  # Autocomplete doesn't provide coordinates
+                "lng": 0,
+                "types": pred.get("types", []),
                 "price_level": 0
             }
         
@@ -231,7 +199,7 @@ def get_place_details(place_name: str, location: str) -> dict:
         return {"name": place_name, "address": "", "rating": 0, "total_ratings": 0, "photo_url": "", "lat": 0, "lng": 0, "types": [], "price_level": 0}
     
     except Exception as e:
-        print(f"⚠️ Error fetching Places API for '{place_name}': {e}")
+        print(f"Error fetching TrackAsia API for '{place_name}': {e}")
         return {"name": place_name, "address": "", "rating": 0, "total_ratings": 0, "photo_url": "", "lat": 0, "lng": 0, "types": [], "price_level": 0}
 
 
@@ -249,9 +217,8 @@ def create_trip_planning_prompt(trip_request: TripRequest) -> str:
     prompt = f"""
 Bạn là một chuyên gia tư vấn du lịch chuyên nghiệp với 15 năm kinh nghiệm trong việc lập kế hoạch du lịch tại Việt Nam và thế giới.
 
-🎯 NHIỆM VỤ: Tạo một kế hoạch du lịch chi tiết, thực tế và hấp dẫn.
-
-📋 THÔNG TIN CHUYẾN ĐI:
+NHIỆM VỤ: Tạo một kế hoạch du lịch chi tiết, thực tế và hấp dẫn
+THÔNG TIN CHUYẾN ĐI:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 • Địa điểm: {trip_request.destination}
 • Thời gian: {trip_request.duration} ngày
@@ -259,7 +226,7 @@ Bạn là một chuyên gia tư vấn du lịch chuyên nghiệp với 15 năm k
 • Ngân sách: {budget_desc}
 • Sở thích: {trip_request.preferences if trip_request.preferences else "Du lịch tổng hợp"}
 
-🎨 YÊU CẦU QUAN TRỌNG:
+YÊU CẦU QUAN TRỌNG:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. **Địa điểm phải CỤ THỂ, CHÍNH XÁC và TÌM ĐƯỢC TRÊN GOOGLE MAPS**: 
    - Sử dụng TÊN CHÍNH XÁC của địa danh, nhà hàng, quán ăn, khách sạn
@@ -284,7 +251,7 @@ Bạn là một chuyên gia tư vấn du lịch chuyên nghiệp với 15 năm k
 
 5. **Tips THỰC TIỄN**: Thời gian tốt nhất, cách di chuyển, lưu ý đặc biệt
 
-📊 FORMAT JSON (CHỈ TRẢ VỀ JSON, KHÔNG CÓ TEXT KHÁC):
+FORMAT JSON (CHỈ TRẢ VỀ JSON, KHÔNG CÓ TEXT KHÁC):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {{
   "trip_name": "Tên chuyến đi hấp dẫn (VD: 'Khám Phá Hà Nội - Hành Trình Nghìn Năm Văn Hiến')",
@@ -339,28 +306,24 @@ Bạn là một chuyên gia tư vấn du lịch chuyên nghiệp với 15 năm k
 - Kế hoạch phải KHẢ THI và DỄ THỰC HIỆN
 - Chỉ trả về JSON, KHÔNG thêm markdown hay text giải thích
 
-🔴 QUY TẮC VỀ TÊN ĐỊA ĐIỂM (BẮT BUỘC):
+QUY TẮC VỀ TÊN ĐỊA ĐIỂM (BẮT BUỘC):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-❌ SAI: "Ăn trưa tại nhà hàng (VD: Quán Ngon)"
-✅ ĐÚNG: "Quán Ngon"
+SAI: "Ăn trưa tại nhà hàng (VD: Quán Ngon)"
+ĐÚNG: "Quán Ngon
+SAI: "Thưởng thức món ăn đường phố"  
+ĐÚNG: "Chợ Đêm Đà Lạt
+SAI: "Nhận phòng khách sạn"
+ĐÚNG: "Dalat Palace Heritage Hotel
+SAI: "Tham quan chùa địa phương"
+ĐÚNG: "Chùa Linh Phước
+SAI: "Mua sắm quà lưu niệm"
+ĐÚNG: "Chợ Đà Lạt"
 
-❌ SAI: "Thưởng thức món ăn đường phố"  
-✅ ĐÚNG: "Chợ Đêm Đà Lạt"
+Trong trường "place": CHỈ GHI TÊN ĐỊA ĐIỂM, KHÔNG GHI MÔ TẢ HOẠT ĐỘNG
+Mô tả hoạt động để trong trường "description"
+TUYỆT ĐỐI KHÔNG dùng "VD:" hay "(VD: ...)" trong trường "place"
 
-❌ SAI: "Nhận phòng khách sạn"
-✅ ĐÚNG: "Dalat Palace Heritage Hotel"
-
-❌ SAI: "Tham quan chùa địa phương"
-✅ ĐÚNG: "Chùa Linh Phước"
-
-❌ SAI: "Mua sắm quà lưu niệm"
-✅ ĐÚNG: "Chợ Đà Lạt"
-
-➡️ Trong trường "place": CHỈ GHI TÊN ĐỊA ĐIỂM, KHÔNG GHI MÔ TẢ HOẠT ĐỘNG
-➡️ Mô tả hoạt động để trong trường "description"
-➡️ TUYỆT ĐỐI KHÔNG dùng "VD:" hay "(VD: ...)" trong trường "place"
-
-🚀 BẮT ĐẦU TẠO KẾ HOẠCH NGAY!
+BẮT ĐẦU TẠO KẾ HOẠCH NGAY!
 """
     
     return prompt
@@ -386,16 +349,16 @@ async def root():
 async def plan_trip(trip_request: TripRequest):
     """Main endpoint: Generate personalized travel itinerary"""
     try:
-        print(f"\n🎯 Creating trip plan for: {trip_request.destination}")
-        print(f"📅 Duration: {trip_request.duration} days | Budget: {trip_request.budget}")
+        print(f"\nCreating trip plan for: {trip_request.destination}")
+        print(f"Duration: {trip_request.duration} days | Budget: {trip_request.budget}")
         
         trip_prompt = create_trip_planning_prompt(trip_request)
         
-        print("🤖 Calling Gemini AI...")
+        print("Calling Gemini AI...")
         response = await model.generate_content_async(trip_prompt)
         raw_text = response.text.strip()
         
-        print("📊 Parsing JSON response...")
+        print("Parsing JSON response...")
         match = re.search(r'```json\s*(\{.*?\})\s*```|(\{.*?\})', raw_text, re.DOTALL)
         
         if not match:
@@ -408,7 +371,7 @@ async def plan_trip(trip_request: TripRequest):
         json_str = match.group(1) or match.group(2)
         trip_plan = json.loads(json_str)
         
-        print("📍 Enriching with Google Places API...")
+        print("Enriching with Google Places API...")
         total_activities = sum(len(day.get("activities", [])) for day in trip_plan.get("days", []))
         processed = 0
         
@@ -432,18 +395,18 @@ async def plan_trip(trip_request: TripRequest):
                     else:
                         print(f"      ⚠ No address found")
         
-        print(f"✅ Trip plan generated successfully with {total_activities} activities!")
+        print(f"Trip plan generated successfully with {total_activities} activities!")
         return JSONResponse(content=trip_plan)
     
     except json.JSONDecodeError as e:
-        print(f"❌ JSON parsing error: {e}")
+        print(f"JSON parsing error: {e}")
         return JSONResponse(
             status_code=500,
             content={"error": "Lỗi parse JSON từ AI", "details": str(e)}
         )
     
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f"Unexpected error: {e}")
         return JSONResponse(
             status_code=500,
             content={"error": "Lỗi máy chủ", "details": str(e)}

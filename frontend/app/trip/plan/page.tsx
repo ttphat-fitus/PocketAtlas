@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "../../../contexts/LanguageContext";
 import {
   DndContext,
   closestCenter,
@@ -143,6 +144,7 @@ interface SortableActivityProps {
   onStartEdit: () => void;
   onFinishEdit: () => void;
   onDelete: () => void;
+  t: (key: string) => string;
 }
 
 function SortableActivity({
@@ -154,6 +156,7 @@ function SortableActivity({
   onStartEdit,
   onFinishEdit,
   onDelete,
+  t,
 }: SortableActivityProps) {
   const {
     attributes,
@@ -211,8 +214,8 @@ function SortableActivity({
                   onChange={(e) => onEdit("time", e.target.value)}
                 />
               ) : (
-                <div className="badge badge-outline mb-2">
-                  ⏰ {activity.time}
+                <div className="badge badge-primary badge-outline mb-2 font-medium">
+                  {activity.time}
                 </div>
               )}
 
@@ -224,15 +227,18 @@ function SortableActivity({
                   onChange={(e) => onEdit("place", e.target.value)}
                 />
               ) : (
-                <h3 className="text-xl font-bold mb-2">
-                  📍 {activity.place}
+                <h3 className="text-xl font-bold mb-2 text-gray-800">
+                  {activity.place}
                 </h3>
               )}
 
               {activity.place_details?.address && (
-                <div className="mb-2">
-                  <div className="flex items-start gap-2 p-2 bg-gray-50 rounded">
-                    <span className="text-blue-600 mt-0.5">📍</span>
+                <div className="mb-3">
+                  <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
                     <p className="text-sm text-gray-700 flex-1">
                       {activity.place_details.address}
                     </p>
@@ -242,21 +248,27 @@ function SortableActivity({
                       href={`https://www.google.com/maps/search/?api=1&query=${activity.place_details.lat},${activity.place_details.lng}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 mt-1 ml-2 text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                      className="inline-flex items-center gap-1 mt-2 ml-2 text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium"
                     >
-                      🗺️ Mở trong Google Maps
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                      </svg>
+                      {t("plan.openMaps")}
                     </a>
                   )}
                 </div>
               )}
 
               {activity.place_details && activity.place_details.rating > 0 && (
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="badge badge-warning">
-                    ⭐ {activity.place_details.rating.toFixed(1)}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-1 bg-yellow-50 px-3 py-1 rounded-full border border-yellow-200">
+                    <svg className="w-4 h-4 text-yellow-500 fill-current" viewBox="0 0 20 20">
+                      <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+                    </svg>
+                    <span className="text-sm font-semibold text-yellow-700">{activity.place_details.rating.toFixed(1)}</span>
                   </div>
                   <span className="text-xs text-gray-500">
-                    ({activity.place_details.total_ratings} đánh giá)
+                    ({activity.place_details.total_ratings} {t("plan.reviews")})
                   </span>
                 </div>
               )}
@@ -280,27 +292,35 @@ function SortableActivity({
                     onChange={(e) => onEdit("estimated_cost", e.target.value)}
                   />
                 ) : (
-                  <div className="badge badge-success">
-                    💰 {activity.estimated_cost}
+                  <div className="badge badge-success gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {activity.estimated_cost}
                   </div>
                 )}
               </div>
 
               {activity.tips && (
-                <div className="alert alert-info py-2">
-                  <span className="text-sm">
-                    💡 <strong>Tips:</strong>{" "}
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        className="input input-bordered input-sm w-full mt-1"
-                        value={activity.tips}
-                        onChange={(e) => onEdit("tips", e.target.value)}
-                      />
-                    ) : (
-                      activity.tips
-                    )}
-                  </span>
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    <div className="flex-1">
+                      <span className="text-sm font-semibold text-blue-900">Tips:</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          className="input input-bordered input-sm w-full mt-1"
+                          value={activity.tips}
+                          onChange={(e) => onEdit("tips", e.target.value)}
+                        />
+                      ) : (
+                        <p className="text-sm text-blue-800 mt-1">{activity.tips}</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -322,18 +342,18 @@ function SortableActivity({
                 className="btn btn-success btn-sm"
                 onClick={onFinishEdit}
               >
-                ✓ Xong
+                {t("plan.done")}
               </button>
             ) : (
               <button className="btn btn-ghost btn-sm" onClick={onStartEdit}>
-                ✏️
+                Edit
               </button>
             )}
             <button
               className="btn btn-ghost btn-sm text-error"
               onClick={onDelete}
             >
-              🗑️
+              Delete
             </button>
             {activity.place_details?.lat !== 0 && (
               <a
@@ -342,7 +362,7 @@ function SortableActivity({
                 rel="noopener noreferrer"
                 className="btn btn-ghost btn-sm"
               >
-                🗺️
+                Map
               </a>
             )}
           </div>
@@ -354,6 +374,7 @@ function SortableActivity({
 
 export default function TripPlanPage() {
   const router = useRouter();
+  const { language, setLanguage, t } = useLanguage();
   const [tripPlan, setTripPlan] = useState<TripPlan | null>(null);
   const [tripParams, setTripParams] = useState<any>(null);
   const [selectedDay, setSelectedDay] = useState(1);
@@ -467,7 +488,7 @@ export default function TripPlanPage() {
             onClick={() => router.push("/trip/input")}
             className="btn btn-ghost"
           >
-            ← Quay lại
+            {t("plan.back")}
           </button>
         </div>
         <div className="navbar-center">
@@ -476,8 +497,22 @@ export default function TripPlanPage() {
           </span>
         </div>
         <div className="navbar-end">
+          <div className="flex gap-2 mr-4">
+            <button
+              onClick={() => setLanguage("en")}
+              className={`btn btn-sm ${language === "en" ? "btn-primary" : "btn-ghost"}`}
+            >
+              EN
+            </button>
+            <button
+              onClick={() => setLanguage("vi")}
+              className={`btn btn-sm ${language === "vi" ? "btn-primary" : "btn-ghost"}`}
+            >
+              VI
+            </button>
+          </div>
           <button className="btn btn-ghost" onClick={() => window.print()}>
-            🖨️ In
+            {t("plan.print")}
           </button>
         </div>
       </div>
@@ -494,13 +529,13 @@ export default function TripPlanPage() {
                   {tripParams && (
                     <>
                       <div className="badge badge-primary badge-lg">
-                        📍 {tripParams.destination}
+                        {tripParams.destination}
                       </div>
                       <div className="badge badge-secondary badge-lg">
-                        ⏰ {tripParams.duration} ngày
+                        {tripParams.duration} {t("input.days")}
                       </div>
                       <div className="badge badge-accent badge-lg">
-                        📅 {new Date(tripParams.start_date).toLocaleDateString("vi-VN")}
+                        {new Date(tripParams.start_date).toLocaleDateString("vi-VN")}
                       </div>
                     </>
                   )}
@@ -509,7 +544,7 @@ export default function TripPlanPage() {
               <div className="flex flex-col gap-2">
                 <div className="stats shadow">
                   <div className="stat">
-                    <div className="stat-title">Tổng chi phí ước tính</div>
+                    <div className="stat-title">{t("plan.totalCost")}</div>
                     <div className="stat-value text-2xl text-primary">
                       {tripPlan.total_estimated_cost}
                     </div>
@@ -520,13 +555,13 @@ export default function TripPlanPage() {
                     className="btn btn-outline btn-sm"
                     onClick={() => setShowPackingList(!showPackingList)}
                   >
-                    🎒 Danh sách đồ
+                    {t("plan.packingList")}
                   </button>
                   <button
                     className="btn btn-outline btn-sm"
                     onClick={() => setShowTips(!showTips)}
                   >
-                    💡 Lời khuyên
+                    {t("plan.travelTips")}
                   </button>
                 </div>
               </div>
@@ -536,7 +571,7 @@ export default function TripPlanPage() {
             {showPackingList && (
               <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                 <h3 className="font-bold text-lg mb-2">
-                  🎒 Danh sách đồ cần mang
+                  {t("plan.packingList.title")}
                 </h3>
                 <ul className="list-disc list-inside grid grid-cols-1 md:grid-cols-2 gap-2">
                   {tripPlan.packing_list.map((item, idx) => (
@@ -551,7 +586,7 @@ export default function TripPlanPage() {
             {/* Travel Tips Modal */}
             {showTips && (
               <div className="mt-4 p-4 bg-green-50 rounded-lg">
-                <h3 className="font-bold text-lg mb-2">💡 Lời khuyên du lịch</h3>
+                <h3 className="font-bold text-lg mb-2">{t("plan.travelTips.title")}</h3>
                 <ul className="list-disc list-inside space-y-2">
                   {tripPlan.travel_tips.map((tip, idx) => (
                     <li key={idx} className="text-gray-700">
@@ -569,7 +604,7 @@ export default function TripPlanPage() {
           <div className="lg:col-span-1">
             <div className="card bg-white shadow-lg sticky top-24">
               <div className="card-body">
-                <h3 className="card-title text-lg mb-4">Địa điểm</h3>
+                <h3 className="card-title text-lg mb-4">{t("plan.locations")}</h3>
                 <div className="space-y-2">
                   {tripPlan.days.map((day) => (
                     <button
@@ -581,25 +616,13 @@ export default function TripPlanPage() {
                           : "btn-ghost btn-outline"
                       }`}
                     >
-                      <span className="font-bold">Ngày {day.day}:</span>
+                      <span className="font-bold">{t("plan.day")} {day.day}:</span>
                       <span className="truncate ml-2 text-sm">
                         {day.title}
                       </span>
                     </button>
                   ))}
                 </div>
-              </div>
-            </div>
-
-            <div className="card bg-white shadow-lg mt-4">
-              <div className="card-body">
-                <h3 className="card-title text-lg mb-4">Thời gian</h3>
-                <p className="text-sm text-gray-600">
-                  Nhập thời gian
-                </p>
-                <button className="btn btn-primary btn-sm mt-2">
-                  Quay lại
-                </button>
               </div>
             </div>
           </div>
@@ -653,6 +676,7 @@ export default function TripPlanPage() {
                             }
                             onFinishEdit={() => setEditingActivity(null)}
                             onDelete={() => handleDeleteActivity(dayIndex, activityIdx)}
+                            t={t}
                           />
                         );
                       })}

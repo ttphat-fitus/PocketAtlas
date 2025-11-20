@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "../../../contexts/LanguageContext";
 
 export default function TripInputPage() {
   const router = useRouter();
+  const { language, setLanguage, t } = useLanguage();
   const [formData, setFormData] = useState({
     destination: "",
     duration: 3,
@@ -20,7 +22,7 @@ export default function TripInputPage() {
     setError("");
 
     if (!formData.destination || !formData.start_date) {
-      setError("Vui lòng điền đầy đủ địa điểm và ngày bắt đầu");
+      setError(t("input.error.required"));
       return;
     }
 
@@ -36,7 +38,7 @@ export default function TripInputPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Không thể tạo kế hoạch du lịch");
+        throw new Error(t("input.error.failed"));
       }
 
       const tripPlan = await response.json();
@@ -49,7 +51,7 @@ export default function TripInputPage() {
       router.push("/trip/plan");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Đã xảy ra lỗi, vui lòng thử lại"
+        err instanceof Error ? err.message : t("input.error.generic")
       );
     } finally {
       setIsLoading(false);
@@ -61,27 +63,39 @@ export default function TripInputPage() {
       <div className="navbar bg-white shadow-sm">
         <div className="navbar-start">
           <a href="/" className="btn btn-ghost text-xl">
-            ← Back
+            {t("plan.back")}
           </a>
         </div>
 
         <div className="navbar-center">
           <a className="text-2xl font-bold text-transparent bg-clip-text bg-linear-to-r from-blue-500 via-teal-500 to-green-500">
-            Pocket Atlas
+            {t("home.title")}
           </a>
         </div>
 
-        <div className="navbar-end" />
+        <div className="navbar-end">
+          <div className="flex gap-1 mr-4">
+            <button
+              onClick={() => setLanguage("en")}
+              className={`btn btn-sm ${language === "en" ? "btn-primary" : "btn-ghost"}`}
+            >
+              EN
+            </button>
+            <button
+              onClick={() => setLanguage("vi")}
+              className={`btn btn-sm ${language === "vi" ? "btn-primary" : "btn-ghost"}`}
+            >
+              VI
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="container mx-auto px-4 py-12 max-w-2xl">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            Để bắt đầu, hãy nhập địa điểm
+            {t("input.title")}
           </h1>
-          <p className="text-gray-600">
-            Nhập địa điểm
-          </p>
         </div>
 
         <div className="card bg-white shadow-xl">
@@ -91,12 +105,12 @@ export default function TripInputPage() {
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold text-lg">
-                    Địa điểm 📍
+                    {t("input.destination")}
                   </span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Nhập địa điểm (ví dụ: Hà Nội, Đà Nẵng, Phú Quốc...)"
+                  placeholder={t("input.destination.placeholder")}
                   className="input input-bordered w-full"
                   value={formData.destination}
                   onChange={(e) =>
@@ -109,7 +123,7 @@ export default function TripInputPage() {
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold text-lg">
-                    Thời gian ⏰
+                    {t("input.duration")}
                   </span>
                 </label>
                 <div className="flex items-center gap-4">
@@ -127,7 +141,7 @@ export default function TripInputPage() {
                     }
                   />
                   <div className="badge badge-primary badge-lg px-4 py-3">
-                    {formData.duration} ngày
+                    {formData.duration} {t("input.days")}
                   </div>
                 </div>
               </div>
@@ -136,7 +150,7 @@ export default function TripInputPage() {
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold text-lg">
-                    Ngày bắt đầu 📅
+                    {t("input.startDate")}
                   </span>
                 </label>
                 <input
@@ -154,7 +168,7 @@ export default function TripInputPage() {
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold text-lg">
-                    Ngân sách 💰
+                    {t("input.budget")}
                   </span>
                 </label>
                 <div className="grid grid-cols-3 gap-3">
@@ -167,7 +181,7 @@ export default function TripInputPage() {
                     }`}
                     onClick={() => setFormData({ ...formData, budget: "low" })}
                   >
-                    💵 Tiết kiệm
+                    {t("input.budget.low")}
                   </button>
                   <button
                     type="button"
@@ -180,7 +194,7 @@ export default function TripInputPage() {
                       setFormData({ ...formData, budget: "medium" })
                     }
                   >
-                    💳 Trung bình
+                    {t("input.budget.medium")}
                   </button>
                   <button
                     type="button"
@@ -191,21 +205,21 @@ export default function TripInputPage() {
                     }`}
                     onClick={() => setFormData({ ...formData, budget: "high" })}
                   >
-                    💎 Cao cấp
+                    {t("input.budget.high")}
                   </button>
                 </div>
               </div>
 
               {/* Sở thích */}
-              <div className="form-control">
+              <div className="form-control flex flex-col">
                 <label className="label">
                   <span className="label-text font-semibold text-lg">
-                    Sở thích (Tùy chọn) ✨
+                    {t("input.preferences")}
                   </span>
                 </label>
                 <textarea
-                  placeholder="Ví dụ: Thích ẩm thực, văn hóa, thiên nhiên, chụp ảnh..."
-                  className="textarea textarea-bordered h-24"
+                  placeholder={t("input.preferences.placeholder")}
+                  className="textarea textarea-bordered h-28 mt-4 w-full"
                   value={formData.preferences}
                   onChange={(e) =>
                     setFormData({ ...formData, preferences: e.target.value })
@@ -215,7 +229,7 @@ export default function TripInputPage() {
 
               {error && (
                 <div className="alert alert-error">
-                  <span>⚠️ {error}</span>
+                  <span>{error}</span>
                 </div>
               )}
 
@@ -228,10 +242,10 @@ export default function TripInputPage() {
                   {isLoading ? (
                     <>
                       <span className="loading loading-spinner"></span>
-                      Đang tạo kế hoạch...
+                      {t("input.generating")}
                     </>
                   ) : (
-                    <>Tiếp tục →</>
+                    <>{t("input.generate")}</>
                   )}
                 </button>
               </div>
