@@ -1,5 +1,5 @@
 import google.generativeai as genai
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +8,10 @@ import json
 import re
 import requests
 from typing import Optional
+from datetime import datetime
+from firebase_config import firebase_db
+from auth_middleware import get_current_user, get_optional_user
+from google.cloud import firestore as firestore_module
 
 GOOGLE_API_KEY = json.load(open("key/chatbot_key.json"))["GOOGLE_API_KEY"]
 TRACKASIA_API_KEY = json.load(open("key/places_key.json"))["TRACK_ASIA_KEY"]
@@ -346,8 +350,8 @@ async def root():
 
 
 @app.post("/api/plan-trip")
-async def plan_trip(trip_request: TripRequest):
-    """Main endpoint: Generate personalized travel itinerary"""
+async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)):
+    """Main endpoint: Generate personalized travel itinerary and save to Firestore"""
     try:
         print(f"\nCreating trip plan for: {trip_request.destination}")
         print(f"Duration: {trip_request.duration} days | Budget: {trip_request.budget}")
@@ -396,6 +400,31 @@ async def plan_trip(trip_request: TripRequest):
                         print(f"      ⚠ No address found")
         
         print(f"Trip plan generated successfully with {total_activities} activities!")
+        
+        # Save trip to Firestore if user is authenticated
+        trip_id = None
+        if user:
+            trip_id = f"{user['uid']}_{int(datetime.now().timestamp())}"
+            trip_data = {
+                "trip_id": trip_id,
+                "user_id": user['uid'],
+                "is_anonymous": user.get('is_anonymous', False),
+                "destination": trip_request.destination,
+                "duration": trip_request.duration,
+                "budget": trip_request.budget,
+                "start_date": trip_request.start_date,
+                "preferences": trip_request.preferences,
+                "trip_plan": trip_plan,
+                "created_at": datetime.now().isoformat(),
+            }
+            
+            # Save to user's trips subcollection
+            firebase_db.collection("users").document(user['uid']).collection("trips").document(trip_id).set(trip_data)
+            print(f"✓ Trip saved to Firestore: {trip_id}")
+            
+            # Add trip_id to response
+            trip_plan["trip_id"] = trip_id
+        
         return JSONResponse(content=trip_plan)
     
     except json.JSONDecodeError as e:
@@ -410,4 +439,72 @@ async def plan_trip(trip_request: TripRequest):
         return JSONResponse(
             status_code=500,
             content={"error": "Lỗi máy chủ", "details": str(e)}
+        )
+
+
+@app.get("/api/my-trips")
+async def get_my_trips(user = Depends(get_current_user)):
+    """Get all trips for the authenticated user"""
+    try:
+        trips_ref = firebase_db.collection("users").document(user['uid']).collection("trips")
+        trips = trips_ref.order_by("created_at", direction=firestore_module.Query.DESCENDING).stream()
+        
+        trips_list = []
+        for trip in trips:
+            trip_data = trip.to_dict()
+            trips_list.append({
+                "trip_id": trip_data.get("trip_id"),
+                "destination": trip_data.get("destination"),
+                "duration": trip_data.get("duration"),
+                "budget": trip_data.get("budget"),
+                "start_date": trip_data.get("start_date"),
+                "created_at": trip_data.get("created_at"),
+                "trip_name": trip_data.get("trip_plan", {}).get("trip_name", ""),
+            })
+        
+        return JSONResponse(content={"trips": trips_list})
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to fetch trips", "details": str(e)}
+        )
+
+
+@app.get("/api/trip/{trip_id}")
+async def get_trip(trip_id: str, user = Depends(get_current_user)):
+    """Get a specific trip by ID"""
+    try:
+        trip_ref = firebase_db.collection("users").document(user['uid']).collection("trips").document(trip_id)
+        trip_doc = trip_ref.get()
+        
+        if not trip_doc.exists:
+            return JSONResponse(
+                status_code=404,
+                content={"error": "Trip not found"}
+            )
+        
+        trip_data = trip_doc.to_dict()
+        return JSONResponse(content=trip_data)
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to fetch trip", "details": str(e)}
+        )
+
+
+@app.delete("/api/trip/{trip_id}")
+async def delete_trip(trip_id: str, user = Depends(get_current_user)):
+    """Delete a specific trip"""
+    try:
+        trip_ref = firebase_db.collection("users").document(user['uid']).collection("trips").document(trip_id)
+        trip_ref.delete()
+        
+        return JSONResponse(content={"message": "Trip deleted successfully"})
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to delete trip", "details": str(e)}
         )

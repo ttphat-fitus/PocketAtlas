@@ -21,6 +21,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+// Format date as dd/mm/yyyy
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
 interface PlaceDetails {
   name: string;
   address: string;
@@ -535,7 +544,7 @@ export default function TripPlanPage() {
                         {tripParams.duration} {t("input.days")}
                       </div>
                       <div className="badge badge-accent badge-lg">
-                        {new Date(tripParams.start_date).toLocaleDateString("vi-VN")}
+                        {formatDate(tripParams.start_date)}
                       </div>
                     </>
                   )}

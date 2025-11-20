@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection
+    match /users/{userId} {
+      // Users can read and write their own user document
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Trips subcollection
+      match /trips/{tripId} {
+        // Users can read and write their own trips
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}

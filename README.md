@@ -10,6 +10,9 @@ This repository contains a Next.js frontend and a FastAPI backend that orchestra
 - Enrich each place with TrackAsia API (address, coordinates, location types)
 - Simple interactive UI to view and edit the generated plan
 - Drag & drop to reorder activities with automatic time recalculation
+- **Firebase Authentication**: Support for email/password login and anonymous users
+- **Trip Storage**: Save trips to Firestore, accessible across devices
+- **Multi-language**: English and Vietnamese interface
 
 ## Project structure (important files)
 - `frontend/` — Next.js app (pages in `frontend/app`, styles in `frontend/app/globals.css`)
@@ -41,7 +44,27 @@ Run frontend
 ```bash
 cd frontend
 npm install
+
+# Create .env.local with Firebase config (see .env.local.example)
+# Add your Firebase credentials from Firebase Console
+
 npm run dev
 # open http://localhost:3000
 ```
+
+## Firebase Setup
+
+1. Create a Firebase project at https://console.firebase.google.com
+2. Enable Authentication (Email/Password, Anonymous)
+3. Create a Firestore database
+4. Get your web app config from Project Settings
+5. Create `frontend/.env.local` with Firebase credentials
+6. Download service account JSON to `backend/key/firebase_key.json`
+
+## API Endpoints
+
+- `POST /api/plan-trip` - Generate new trip (supports auth)
+- `GET /api/my-trips` - Get user's saved trips (requires auth)
+- `GET /api/trip/{trip_id}` - Get specific trip (requires auth)
+- `DELETE /api/trip/{trip_id}` - Delete trip (requires auth)
 

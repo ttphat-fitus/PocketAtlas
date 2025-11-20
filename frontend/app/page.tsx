@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function LandingPage() {
+  const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
+  const { user, loading, signOut } = useAuth();
   
   const destinations: string[] = [
     "Hà Nội",
@@ -54,12 +58,31 @@ export default function LandingPage() {
           </a>
         </div>
 
-        <div className="navbar-end">
-          <ul className="menu menu-horizontal px-1">
-            <li>
-              <a href="/trip/input">{t("home.planTrip.button")}</a>
-            </li>
-          </ul>
+        <div className="navbar-end mr-4">
+          {loading ? (
+            <div className="loading loading-spinner loading-sm"></div>
+          ) : user ? (
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">
+                {user.email || (language === "en" ? "Guest" : "Khách")}
+              </span>
+              {!user.isAnonymous && (
+                <a href="/trips" className="btn btn-ghost btn-sm">
+                  {language === "en" ? "My Trips" : "Chuyến đi"}
+                </a>
+              )}
+              <a href="/trip/input" className="btn btn-primary btn-sm">
+                {t("home.planTrip.button")}
+              </a>
+              <button onClick={() => signOut()} className="btn btn-ghost btn-sm">
+                {language === "en" ? "Sign Out" : "Đăng xuất"}
+              </button>
+            </div>
+          ) : (
+            <a href="/auth" className="btn btn-primary">
+              {language === "en" ? "Get Started" : "Bắt đầu"}
+            </a>
+          )}
         </div>
       </div>
 
@@ -85,7 +108,7 @@ export default function LandingPage() {
           {t("home.description")}
         </h2>
 
-        <a href="/trip/input" className="mt-8">
+        <a href="/auth" className="mt-8">
           <button className="btn btn-primary btn-lg rounded-full px-8 text-lg">
             {t("home.getStarted")}
           </button>

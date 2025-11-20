@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "../contexts/LanguageContext";
+import { AuthProvider } from "../contexts/AuthContext";
 
 const body = Roboto({
   subsets: ["latin"],
@@ -29,9 +30,11 @@ export default function RootLayout({
       <body
         className={`${body.variable} ${heading.variable} font-sans antialiased bg-white text-slate-900`}
       >
-        <LanguageProvider>
-          {children}
-        </LanguageProvider>
+        <AuthProvider>
+          <LanguageProvider>
+            {children}
+          </LanguageProvider>
+        </AuthProvider>
       </body>
     </html>
   );

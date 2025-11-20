@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "../../../contexts/LanguageContext";
+import { useAuth } from "../../../contexts/AuthContext";
 
 export default function TripInputPage() {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
+  const { user, loading: authLoading, signInAnon, getIdToken } = useAuth();
   const [formData, setFormData] = useState({
     destination: "",
     duration: 3,
@@ -16,6 +18,13 @@ export default function TripInputPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Redirect to auth if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/auth");
+    }
+  }, [user, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,11 +38,19 @@ export default function TripInputPage() {
     setIsLoading(true);
 
     try {
+      // Get Firebase ID token
+      const token = await getIdToken();
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetch("http://localhost:8000/api/plan-trip", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(formData),
       });
 
@@ -43,11 +60,11 @@ export default function TripInputPage() {
 
       const tripPlan = await response.json();
       
-      // Lưu trip plan vào localStorage để truyền sang trang kế tiếp
+      // Save trip plan to localStorage as fallback
       localStorage.setItem("tripPlan", JSON.stringify(tripPlan));
       localStorage.setItem("tripParams", JSON.stringify(formData));
       
-      // Chuyển sang trang hiển thị kế hoạch
+      // Navigate to plan page
       router.push("/trip/plan");
     } catch (err) {
       setError(
