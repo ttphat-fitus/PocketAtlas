@@ -1,4 +1,4 @@
-# Pocket Atlas — AI Travel Planner 🗺️
+# Pocket Atlas
 
 > An intelligent AI-powered travel itinerary generator that creates personalized day-by-day trip plans. Simply provide your destination, travel dates, preferences, and budget—the app leverages Google Gemini AI to generate comprehensive itineraries and enriches locations with TrackAsia geocoding API (addresses, coordinates, ratings, photos, and map links).
 
@@ -38,49 +38,6 @@ This repository contains a Next.js 16 frontend with TypeScript and a FastAPI bac
 - **Photo Gallery**: Visual previews of destinations and activities
 - **Travel Blog**: Tips, guides, and inspiration for your adventures
 
-## 📁 Project Structure
-
-```
-.
-├── frontend/                 # Next.js 16 application (React 19)
-│   ├── app/                  # App router pages
-│   │   ├── page.tsx          # Home page
-│   │   ├── plan/             # Trip planning interface
-│   │   ├── trips/            # My trips (saved itineraries)
-│   │   ├── trip/[tripId]/    # Individual trip details
-│   │   ├── explore/          # Public trip catalog
-│   │   ├── blog/             # Travel blog
-│   │   ├── auth/             # Authentication pages
-│   │   └── api/              # API routes
-│   ├── components/           # React components
-│   ├── contexts/             # React contexts (Auth, Language)
-│   ├── lib/                  # Utilities and helpers
-│   └── public/               # Static assets
-│
-├── backend/                  # FastAPI application
-│   ├── main.py               # Main API server
-│   ├── firebase_config.py    # Firebase Admin SDK configuration
-│   ├── auth_middleware.py    # Authentication middleware
-│   ├── requirements.txt      # Python dependencies
-│   └── key/                  # API keys (create this directory)
-│       ├── chatbot_key.json  # Gemini API key
-│       ├── ocr_key.json      # TrackAsia API key
-│       ├── speech_key.json   # Speech API key
-│       └── firebase_key.json # Firebase service account
-│
-└── README.md                 # This file
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-- **Node.js**: v18+ (v20 recommended)
-- **Python**: 3.10+ (3.13 recommended)
-- **Firebase Project**: Create at [Firebase Console](https://console.firebase.google.com)
-- **API Keys**:
-  - Google Gemini API key
-  - TrackAsia API key (optional, for location enrichment)
-
 ### Backend Setup
 
 1. **Navigate to backend directory**
@@ -108,25 +65,7 @@ pip install -r requirements.txt
 
 4. **Configure API keys**
 
-Create `backend/key/` directory and add the following JSON files:
-
-**chatbot_key.json** (Gemini API):
-```json
-{
-  "api_key": "your-gemini-api-key-here"
-}
-```
-
-**ocr_key.json** (TrackAsia API):
-```json
-{
-  "api_key": "your-trackasia-api-key-here"
-}
-```
-
-**firebase_key.json** (Firebase Service Account):
-- Download from Firebase Console → Project Settings → Service Accounts
-- Click "Generate new private key"
+Create `backend/key/` directory and add the API JSON files
 
 5. **Run the backend server**
 ```bash
@@ -169,53 +108,7 @@ npm run dev
 
 The app will be available at `http://localhost:3000`
 
-### Firebase Setup
 
-1. **Create Firebase Project**
-   - Go to [Firebase Console](https://console.firebase.google.com)
-   - Click "Add project"
-   - Follow the setup wizard
-
-2. **Enable Authentication**
-   - Navigate to Authentication → Sign-in method
-   - Enable Email/Password
-   - Enable Anonymous
-   - (Optional) Enable Google Sign-In
-
-3. **Create Firestore Database**
-   - Navigate to Firestore Database
-   - Click "Create database"
-   - Choose "Start in production mode"
-   - Select your region
-
-4. **Set up Firestore Security Rules**
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /trips/{tripId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == resource.data.user_id;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.user_id;
-    }
-    
-    match /public_trips/{tripId} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-  }
-}
-```
-
-5. **Get Web App Credentials**
-   - Project Settings → General → Your apps
-   - Click web icon (</>)
-   - Register app and copy config to `.env.local`
-
-6. **Download Service Account Key**
-   - Project Settings → Service Accounts
-   - Click "Generate new private key"
-   - Save as `backend/key/firebase_key.json`
 
 ## 📡 API Endpoints
 
@@ -287,21 +180,6 @@ Each trip contains:
 - Anonymous users have limited access
 - Token validation on protected endpoints
 
-## 🌐 Environment Variables
-
-### Backend
-No `.env` file needed - all config in JSON files under `backend/key/`
-
-### Frontend (`.env.local`)
-```env
-NEXT_PUBLIC_FIREBASE_API_KEY=
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
-NEXT_PUBLIC_FIREBASE_APP_ID=
-```
-
 ## 📝 Development
 
 ### Run in Development Mode
@@ -326,23 +204,3 @@ npm start
 cd backend
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is for educational purposes. Please respect API usage limits and terms of service for Gemini AI and TrackAsia.
-
-## 👥 Authors
-
-- **HCMUS Team** - Travel Technology Course Final Project
-
-## 🙏 Acknowledgments
-
-- Google Gemini AI for trip generation
-- TrackAsia for location data and geocoding
-- Firebase for authentication and storage
-- Next.js and FastAPI communities
-
