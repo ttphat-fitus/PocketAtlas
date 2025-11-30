@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
+import StarRating from "../../components/StarRating";
 
 interface TripSummary {
   trip_id: string;
@@ -13,6 +14,8 @@ interface TripSummary {
   start_date: string;
   created_at: string;
   trip_name: string;
+  rating?: number;
+  activity_level?: string;
 }
 
 // Format date as dd/mm/yyyy
@@ -379,29 +382,43 @@ export default function MyTripsPage() {
                     <div className="card-body p-6">
                       <div className="text-xs text-gray-400 mb-3">
                         {language === "en" ? `Created: ${formatDate(trip.created_at)}` : `Tạo lúc: ${formatDate(trip.created_at)}`}
+                        {(!trip.rating || trip.rating === 0) && (
+                          <>
+                            {" • "}
+                            {language === "en" ? "Not yet rated" : "Chưa đánh giá"}
+                          </>
+                        )}
                       </div>
                       
                       <h3 className="text-xl font-bold mb-4">{trip.trip_name || trip.destination}</h3>
-                      
-                      <div className="space-y-2 text-sm text-gray-700 mb-4">
-                        <div className="flex items-center gap-2">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <span><strong>{language === "en" ? "Destination:" : "Điểm đến:"}</strong> {trip.destination}</span>
+                      {trip.rating > 0 && (
+                        <div className="flex items-center gap-2 mb-4">
+                          <StarRating rating={trip.rating} readonly size="sm" />
+                          <span className="text-xs text-gray-500">
+                            {language === "en" ? "Your rating" : "Đánh giá của bạn"}
+                          </span>
                         </div>
+                      )}
+
+                      {/* Time, Budget, Activity Info */}
+                      <div className="space-y-2 text-sm text-gray-700 mb-4">
                         <div className="flex items-center gap-2">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          <span><strong>{language === "en" ? "Duration:" : "Thời gian:"}</strong> {trip.duration} {language === "en" ? "day" : "ngày"}</span>
+                          <span><strong>{language === "en" ? "Time:" : "Thời gian:"}</strong> {trip.duration} {language === "en" ? "day" : "ngày"}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           <span><strong>{language === "en" ? "Budget:" : "Ngân sách:"}</strong> {trip.budget === "low" ? (language === "en" ? "Low" : "Thấp") : trip.budget === "medium" ? (language === "en" ? "Medium" : "Trung bình") : (language === "en" ? "High" : "Cao")}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <span><strong>{language === "en" ? "Activity:" : "Hoạt động:"}</strong> {trip.activity_level === "low" ? (language === "en" ? "Low" : "Thấp") : trip.activity_level === "high" ? (language === "en" ? "High" : "Cao") : (language === "en" ? "Medium" : "Trung bình")}</span>
                         </div>
                       </div>
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useAuth } from "../../../contexts/AuthContext";
+import StarRating from "../../../components/StarRating";
 import {
   DndContext,
   closestCenter,
@@ -49,6 +50,57 @@ const exportToGoogleCalendar = (tripData: any, tripPlan: any) => {
   window.open(url, '_blank');
 };
 
+// Export to Apple Calendar (.ics file)
+const exportToAppleCalendar = (tripData: any, tripPlan: any) => {
+  const startDate = new Date(tripData.start_date);
+  const endDate = new Date(tripData.start_date);
+  endDate.setDate(endDate.getDate() + tripData.duration);
+  
+  const formatICSDate = (date: Date) => {
+    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  };
+  
+  // Build detailed description with daily itinerary
+  let description = `${tripPlan.overview}\\n\\n`;
+  tripPlan.days.forEach((day: any) => {
+    description += `Day ${day.day}: ${day.title}\\n`;
+    day.activities.forEach((activity: any) => {
+      description += `- ${activity.time}: ${activity.place}\\n`;
+    });
+    description += `\\n`;
+  });
+  
+  // Create ICS file content
+  const icsContent = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Pocket Atlas//Trip Planner//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `DTSTART:${formatICSDate(startDate)}`,
+    `DTEND:${formatICSDate(endDate)}`,
+    `SUMMARY:${tripPlan.trip_name || `Trip to ${tripData.destination}`}`,
+    `DESCRIPTION:${description.replace(/\n/g, '\\n')}`,
+    `LOCATION:${tripData.destination}`,
+    `STATUS:CONFIRMED`,
+    `SEQUENCE:0`,
+    `UID:${tripData.trip_id}@pocketatlas.com`,
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+  
+  // Create blob and download
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `${tripPlan.trip_name || tripData.destination}.ics`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+};
+
 interface PlaceDetails {
   name: string;
   address: string;
@@ -58,6 +110,7 @@ interface PlaceDetails {
   lat: number;
   lng: number;
   types?: string[];
+  google_maps_link?: string;
 }
 
 interface Activity {
@@ -75,6 +128,17 @@ interface Day {
   activities: Activity[];
 }
 
+interface WeatherForecast {
+  day: number;
+  date: string;
+  condition: string;
+  temp_max: number;
+  temp_min: number;
+  rain_chance: number;
+  humidity: number;
+  suggestion: string;
+}
+
 interface TripPlan {
   trip_name: string;
   overview: string;
@@ -82,6 +146,7 @@ interface TripPlan {
   days: Day[];
   packing_list: string[];
   travel_tips: string[];
+  weather_forecast?: WeatherForecast[];
 }
 
 interface TripData {
@@ -93,6 +158,9 @@ interface TripData {
   preferences: string;
   trip_plan: TripPlan;
   created_at: string;
+  activity_level?: string;
+  is_public?: boolean;
+  category_tags?: string[];
 }
 
 // Sortable Activity Item Component
@@ -116,7 +184,23 @@ function SortableActivity({ activity, id, language }: { activity: Activity; id: 
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <div className="badge badge-primary badge-sm mb-1">{activity.time}</div>
-                  <h4 className="font-bold text-lg">{activity.place}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-lg">{activity.place}</h4>
+                    {activity.place_details?.google_maps_link && (
+                      <a
+                        href={activity.place_details.google_maps_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-circle btn-xs btn-ghost text-blue-600 hover:bg-blue-100 hover:text-blue-800"
+                        title="Mở trong Google Maps"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                        </svg>
+                      </a>
+                    )}
+                  </div>
                   {activity.place_details?.address && (
                     <p className="text-sm text-gray-500 mt-1">
                       <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,6 +258,8 @@ export default function TripDetailPage() {
   const [tripPlan, setTripPlan] = useState<TripPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [rating, setRating] = useState(0);
+  const [ratingUpdating, setRatingUpdating] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -211,6 +297,7 @@ export default function TripDetailPage() {
         const data = await response.json();
         setTripData(data);
         setTripPlan(data.trip_plan);
+        setRating(data.rating || 0);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load trip");
       } finally {
@@ -222,6 +309,40 @@ export default function TripDetailPage() {
       fetchTrip();
     }
   }, [user, tripId, getIdToken]);
+
+  const handleRatingChange = async (newRating: number) => {
+    if (!user || !tripId || ratingUpdating) return;
+
+    setRatingUpdating(true);
+    const oldRating = rating;
+    setRating(newRating);
+
+    try {
+      const token = await getIdToken();
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(`http://localhost:8000/api/trip/${tripId}/rating`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ rating: newRating }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update rating");
+      }
+    } catch (err) {
+      // Revert rating on error
+      setRating(oldRating);
+      console.error("Failed to update rating:", err);
+    } finally {
+      setRatingUpdating(false);
+    }
+  };
 
   const handleDragEnd = (event: DragEndEvent, dayIndex: number) => {
     const { active, over } = event;
@@ -294,45 +415,216 @@ export default function TripDetailPage() {
       </div>
 
       <div className="container mx-auto p-6 max-w-7xl">
+        {/* Header with title and metadata */}
+        <div className="card bg-white shadow-xl mb-6">
+          <div className="card-body">
+            <div className="text-xs text-gray-400 mb-2">
+              {language === "en" ? `Created: ${formatDate(tripData.created_at)}` : `Tạo lúc: ${formatDate(tripData.created_at)}`}
+              {" • "}
+              {(!rating || rating === 0) ? (
+                language === "en" ? "Not yet rated" : "Chưa đánh giá"
+              ) : (
+                <span className="text-yellow-500 font-semibold">{language === "en" ? "Rated" : "Đã đánh giá"}</span>
+              )}
+            </div>
+            <h1 className="text-3xl font-bold mb-4">{tripPlan.trip_name}</h1>
+            
+            {/* Trip Metadata - Time, Budget, Activity */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="flex items-center gap-3 p-3 bg-pink-50 rounded-lg">
+                <svg className="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1">
+                  <div className="text-xs text-gray-500">{language === "en" ? "Time" : "Thời gian"}</div>
+                  <div className="font-semibold text-gray-800">{tripData.duration} {language === "en" ? "day" : "ngày"}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1">
+                  <div className="text-xs text-gray-500">{language === "en" ? "Budget" : "Ngân sách"}</div>
+                  <div className="font-semibold text-gray-800 capitalize">{tripData.budget}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
+                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <div className="flex-1">
+                  <div className="text-xs text-gray-500">{language === "en" ? "Activity" : "Hoạt động"}</div>
+                  <div className="font-semibold text-gray-800 capitalize">
+                    {tripData.activity_level === "low" ? (language === "en" ? "Low" : "Thấp") : tripData.activity_level === "high" ? (language === "en" ? "High" : "Cao") : (language === "en" ? "Medium" : "Trung bình")}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <p className="text-gray-600">{tripPlan.overview}</p>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="lg:col-span-1">
             <div className="card bg-white shadow-xl sticky top-24">
-              <div className="card-body">
-                <h2 className="card-title text-lg mb-4">{language === "en" ? "Trip Information" : "Thông tin chuyến đi"}</h2>
+              <div className="card-body p-6">
+                <h2 className="card-title text-xl mb-6 text-center w-full">
+                  {language === "en" ? "Trip Information" : "Thông tin chuyến đi"}
+                </h2>
                 
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <div className="badge badge-primary badge-lg">
-                    {tripData.destination}
-                  </div>
-                  <div className="badge badge-secondary badge-lg">
-                    {tripData.duration} {language === "en" ? "days" : "ngày"}
-                  </div>
-                  <div className="badge badge-accent badge-lg">
-                    {formatDate(tripData.start_date)}
+                {/* Rating Section - Moved to Top */}
+                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-4 rounded-lg mb-6">
+                  <h3 className="font-bold mb-3 flex items-center justify-center gap-2 text-gray-700">
+                    <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    {language === "en" ? "Rate this trip" : "Đánh giá chuyến đi"}
+                  </h3>
+                  <div className="flex flex-col items-center gap-2">
+                    <StarRating
+                      rating={rating}
+                      onRatingChange={handleRatingChange}
+                      size="lg"
+                    />
+                    {ratingUpdating && (
+                      <span className="text-xs text-gray-500">
+                        {language === "en" ? "Saving..." : "Đang lưu..."}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="stats shadow">
-                  <div className="stat p-4">
-                    <div className="stat-title text-sm">{language === "en" ? "Total Cost" : "Tổng chi phí"}</div>
-                    <div className="stat-value text-xl text-primary">
-                      {tripPlan.total_estimated_cost}
+                {/* Trip Details */}
+                <div className="space-y-4 mb-6">
+                  <div className="flex items-center gap-3 p-3 bg-teal-50 rounded-lg">
+                    <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <div className="flex-1">
+                      <div className="text-xs text-gray-500">{language === "en" ? "Start Date" : "Ngày bắt đầu"}</div>
+                      <div className="font-semibold text-gray-800">{formatDate(tripData.start_date)}</div>
                     </div>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => exportToGoogleCalendar(tripData, tripPlan)}
-                  className="btn btn-primary btn-sm w-full gap-2 mt-4"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/>
-                  </svg>
-                  {language === "en" ? "Export to Google Calendar" : "Xuất sang Google Calendar"}
-                </button>
+                {/* Total Cost - Minimized */}
+                <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-3 rounded-lg mb-6 text-center shadow-md">
+                  <div className="text-xs opacity-90 mb-0.5">{language === "en" ? "Total Cost" : "Tổng chi phí"}</div>
+                  <div className="text-lg font-bold">
+                    {tripPlan.total_estimated_cost}
+                  </div>
+                </div>
 
-                <div className="divider"></div>
+                {/* Export Button */}
+                {/* Export Buttons */}
+                <div className="space-y-2">
+                  <button
+                    onClick={() => exportToGoogleCalendar(tripData, tripPlan)}
+                    className="btn btn-primary w-full gap-2 shadow-md hover:shadow-lg transition-all text-sm whitespace-nowrap"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/>
+                    </svg>
+                    <span className="truncate">{language === "en" ? "Google Calendar" : "Google Calendar"}</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => exportToAppleCalendar(tripData, tripPlan)}
+                    className="btn btn-outline btn-primary w-full gap-2 shadow-md hover:shadow-lg transition-all text-sm whitespace-nowrap"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                    </svg>
+                    <span className="truncate">{language === "en" ? "Apple Calendar" : "Apple Calendar"}</span>
+                  </button>
+                  
+                  {/* Toggle Public/Private Button */}
+                  <button
+                    onClick={async () => {
+                      if (!user || !tripId) return;
+                      
+                      const newIsPublic = !tripData.is_public;
+                      
+                      try {
+                        const token = await getIdToken();
+                        const response = await fetch(`http://localhost:8000/api/trip/${tripId}/toggle-public`, {
+                          method: "POST",
+                          headers: {
+                            Authorization: `Bearer ${token}`,
+                            "Content-Type": "application/json",
+                          },
+                          body: JSON.stringify({
+                            is_public: newIsPublic,
+                            category_tags: tripData.category_tags || [],
+                          }),
+                        });
+                        
+                        if (response.ok) {
+                          setTripData({ ...tripData, is_public: newIsPublic });
+                        }
+                      } catch (err) {
+                        console.error("Failed to toggle public status:", err);
+                      }
+                    }}
+                    className={`btn w-full gap-2 shadow-md hover:shadow-lg transition-all text-sm ${
+                      tripData.is_public ? "btn-success" : "btn-outline"
+                    }`}
+                  >
+                    {tripData.is_public ? (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{language === "en" ? "Public" : "Đã công khai"}</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <span>{language === "en" ? "Make Public" : "Công khai"}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="divider my-6"></div>
+
+                {/* Weather Forecast Section */}
+                {tripPlan.weather_forecast && tripPlan.weather_forecast.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="font-bold mb-3 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2a6 6 0 00-6 6c0 4.314 6 10 6 10s6-5.686 6-10a6 6 0 00-6-6zm0 8a2 2 0 110-4 2 2 0 010 4z"/>
+                      </svg>
+                      {language === "en" ? "Weather Forecast" : "Dự báo thời tiết"}
+                    </h3>
+                    <div className="space-y-2">
+                      {tripPlan.weather_forecast.map((weather, idx) => (
+                        <div key={idx} className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-3 border border-blue-100">
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="text-sm font-semibold text-gray-700">
+                              {language === "en" ? `Day ${weather.day}` : `Ngày ${weather.day}`}
+                            </div>
+                            <div className="text-lg font-bold text-blue-600">
+                              {weather.temp_max}° / {weather.temp_min}°C
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-600 mb-1">{weather.condition}</div>
+                          <div className="flex gap-3 text-xs text-gray-600">
+                            <span>☔ {weather.rain_chance}%</span>
+                            <span>💧 {weather.humidity}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <div>
@@ -375,13 +667,6 @@ export default function TripDetailPage() {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            <div className="card bg-white shadow-xl mb-6">
-              <div className="card-body">
-                <h2 className="card-title text-2xl mb-2">{tripPlan.trip_name}</h2>
-                <p className="text-gray-600">{tripPlan.overview}</p>
-              </div>
-            </div>
-
             {/* Days Timeline */}
             <div className="space-y-6">
               {tripPlan.days.map((day, dayIndex) => (

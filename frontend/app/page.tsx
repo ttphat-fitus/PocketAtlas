@@ -66,6 +66,12 @@ export default function LandingPage() {
               <span className="text-sm text-gray-600">
                 {user.email || (language === "en" ? "Guest" : "Khách")}
               </span>
+              <a href="/explore" className="btn btn-ghost btn-sm">
+                {language === "en" ? "Explore" : "Khám phá"}
+              </a>
+              <a href="/blog" className="btn btn-ghost btn-sm">
+                {language === "en" ? "Blog" : "Blog"}
+              </a>
               {!user.isAnonymous && (
                 <a href="/trips" className="btn btn-ghost btn-sm">
                   {language === "en" ? "My Trips" : "Chuyến đi"}
@@ -79,9 +85,17 @@ export default function LandingPage() {
               </button>
             </div>
           ) : (
-            <a href="/auth" className="btn btn-primary">
-              {language === "en" ? "Get Started" : "Bắt đầu"}
-            </a>
+            <div className="flex items-center gap-2">
+              <a href="/explore" className="btn btn-ghost btn-sm">
+                {language === "en" ? "Explore" : "Khám phá"}
+              </a>
+              <a href="/blog" className="btn btn-ghost btn-sm">
+                {language === "en" ? "Blog" : "Blog"}
+              </a>
+              <a href="/auth" className="btn btn-primary">
+                {language === "en" ? "Get Started" : "Bắt đầu"}
+              </a>
+            </div>
           )}
         </div>
       </div>

@@ -61,6 +61,13 @@ const translations = {
     "plan.openMaps": "Open in Google Maps",
     "plan.reviews": "reviews",
     "plan.dragToReorder": "Drag to reorder",
+    
+    // Loading screen
+    "loading.analyzing": "Analyzing your preferences...",
+    "loading.searching": "Searching best destinations...",
+    "loading.planning": "Planning your itinerary...",
+    "loading.finalizing": "Finalizing your trip...",
+    "loading.subtitle": "Creating your perfect journey",
   },
   vi: {
     // Homepage
@@ -110,6 +117,13 @@ const translations = {
     "plan.openMaps": "Mở trong Google Maps",
     "plan.reviews": "đánh giá",
     "plan.dragToReorder": "Kéo để sắp xếp lại",
+    
+    // Loading screen
+    "loading.analyzing": "Đang phân tích sở thích của bạn...",
+    "loading.searching": "Đang tìm kiếm điểm đến tốt nhất...",
+    "loading.planning": "Đang lập kế hoạch hành trình...",
+    "loading.finalizing": "Đang hoàn thiện chuyến đi...",
+    "loading.subtitle": "Tạo hành trình hoàn hảo cho bạn",
   },
 };
 
