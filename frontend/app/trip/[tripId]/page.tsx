@@ -147,6 +147,7 @@ interface TripPlan {
   packing_list: string[];
   travel_tips: string[];
   weather_forecast?: WeatherForecast[];
+  cover_image?: string;
 }
 
 interface TripData {
@@ -418,6 +419,18 @@ export default function TripDetailPage() {
         {/* Header with title and metadata */}
         <div className="card bg-white shadow-xl mb-6">
           <div className="card-body">
+            {/* Cover Image */}
+            {tripPlan.cover_image && (
+              <div className="relative h-64 w-full rounded-xl overflow-hidden mb-6 -mx-8 -mt-8">
+                <img
+                  src={tripPlan.cover_image}
+                  alt={tripPlan.trip_name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+              </div>
+            )}
+            
             <div className="text-xs text-gray-400 mb-2">
               {language === "en" ? `Created: ${formatDate(tripData.created_at)}` : `Tạo lúc: ${formatDate(tripData.created_at)}`}
               {" • "}
@@ -512,11 +525,16 @@ export default function TripDetailPage() {
                   </div>
                 </div>
 
-                {/* Total Cost - Minimized */}
-                <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-3 rounded-lg mb-6 text-center shadow-md">
-                  <div className="text-xs opacity-90 mb-0.5">{language === "en" ? "Total Cost" : "Tổng chi phí"}</div>
-                  <div className="text-lg font-bold">
-                    {tripPlan.total_estimated_cost}
+                {/* Total Cost - Updated gradient card style */}
+                <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-4 mb-6 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <svg className="w-6 h-6 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-indigo-600 font-medium">{language === "en" ? "Total Cost" : "Tổng chi phí"}</div>
+                      <div className="text-sm font-bold text-gray-800 leading-tight break-words">{tripPlan.total_estimated_cost.replace(/đ/g, '₫').replace(/VND/g, '₫')}</div>
+                    </div>
                   </div>
                 </div>
 

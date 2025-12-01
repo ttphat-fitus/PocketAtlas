@@ -36,19 +36,39 @@ export default function LandingPage() {
     <div className="flex flex-col min-h-screen">
       <div className="navbar bg-white shadow-sm">
         <div className="navbar-start">
-          <div className="flex gap-1 ml-4">
-            <button
-              onClick={() => setLanguage("en")}
-              className={`btn btn-sm ${language === "en" ? "btn-primary" : "btn-ghost"}`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setLanguage("vi")}
-              className={`btn btn-sm ${language === "vi" ? "btn-primary" : "btn-ghost"}`}
-            >
-              VI
-            </button>
+          <div className="flex items-center gap-2 ml-4">
+            {/* Language Toggle */}
+            <div className="flex gap-1">
+              <button
+                onClick={() => setLanguage("en")}
+                className={`btn btn-sm ${
+                  language === "en"
+                    ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0 hover:from-blue-600 hover:to-purple-600"
+                    : "btn-ghost"
+                }`}
+              >
+                EN
+              </button>
+              <button
+                onClick={() => setLanguage("vi")}
+                className={`btn btn-sm ${
+                  language === "vi"
+                    ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0 hover:from-blue-600 hover:to-purple-600"
+                    : "btn-ghost"
+                }`}
+              >
+                VI
+              </button>
+            </div>
+            
+            {/* Navigation Links */}
+            <div className="divider divider-horizontal mx-1"></div>
+            <a href="/explore" className="btn btn-ghost btn-sm font-semibold">
+              {language === "en" ? "Explore" : "Khám phá"}
+            </a>
+            <a href="/blog" className="btn btn-ghost btn-sm font-semibold">
+              Blog
+            </a>
           </div>
         </div>
 
@@ -63,19 +83,15 @@ export default function LandingPage() {
             <div className="loading loading-spinner loading-sm"></div>
           ) : user ? (
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">
-                {user.email || (language === "en" ? "Guest" : "Khách")}
-              </span>
-              <a href="/explore" className="btn btn-ghost btn-sm">
-                {language === "en" ? "Explore" : "Khám phá"}
-              </a>
-              <a href="/blog" className="btn btn-ghost btn-sm">
-                {language === "en" ? "Blog" : "Blog"}
-              </a>
               {!user.isAnonymous && (
-                <a href="/trips" className="btn btn-ghost btn-sm">
-                  {language === "en" ? "My Trips" : "Chuyến đi"}
-                </a>
+                <>
+                  <a href="/profile" className="btn btn-ghost btn-sm">
+                    {language === "en" ? "Profile" : "Hồ sơ"}
+                  </a>
+                  <a href="/trips" className="btn btn-ghost btn-sm">
+                    {language === "en" ? "My Trips" : "Chuyến đi"}
+                  </a>
+                </>
               )}
               <a href="/trip/input" className="btn btn-primary btn-sm">
                 {t("home.planTrip.button")}
@@ -85,17 +101,9 @@ export default function LandingPage() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <a href="/explore" className="btn btn-ghost btn-sm">
-                {language === "en" ? "Explore" : "Khám phá"}
-              </a>
-              <a href="/blog" className="btn btn-ghost btn-sm">
-                {language === "en" ? "Blog" : "Blog"}
-              </a>
-              <a href="/auth" className="btn btn-primary">
-                {language === "en" ? "Get Started" : "Bắt đầu"}
-              </a>
-            </div>
+            <a href="/auth" className="btn btn-primary">
+              {language === "en" ? "Get Started" : "Bắt đầu"}
+            </a>
           )}
         </div>
       </div>

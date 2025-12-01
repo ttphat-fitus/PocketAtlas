@@ -1,5 +1,5 @@
 import google.generativeai as genai
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +16,7 @@ from google.cloud import firestore as firestore_module
 GOOGLE_API_KEY = json.load(open("key/chatbot_key.json"))["GOOGLE_API_KEY"]
 GOOGLE_MAPS_API_KEY = json.load(open("key/maps_key.json"))["GOOGLE_MAPS_API_KEY"]
 WEATHER_API_KEY = json.load(open("key/weather_key.json"))["WeatherAPIKey"]
+UNSPLASH_ACCESS_KEY = json.load(open("key/unsplash_key.json"))["credentials"]["accessKey"]
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
@@ -67,6 +68,41 @@ class TripRequest(BaseModel):
     active_time_end: Optional[int] = 21
 
 # ============== Helper Functions ==============
+def get_unsplash_image(destination: str) -> str:
+    """Get a high-quality image from Unsplash for a destination"""
+    try:
+        url = "https://api.unsplash.com/search/photos"
+        params = {
+            "client_id": UNSPLASH_ACCESS_KEY,
+            "query": f"{destination} landmark",
+            "per_page": 1,
+            "orientation": "landscape",
+            "content_filter": "high"
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("results") and len(data["results"]) > 0:
+                image_url = data["results"][0]["urls"]["regular"]
+                print(f"✓ Unsplash: Found image for '{destination}'")
+                return image_url
+            else:
+                print(f"⚠ Unsplash: No results for '{destination}'")
+        else:
+            print(f"✗ Unsplash API Error {response.status_code}: {response.text[:100]}")
+            
+    except Exception as e:
+        print(f"✗ Unsplash Exception: {e}")
+    
+    # Fallback to Lorem Picsum
+    seed = destination.replace(' ', '').replace(',', '').lower()
+    fallback_url = f"https://picsum.photos/seed/{seed}/1200/800"
+    print(f"→ Using fallback image for '{destination}'")
+    return fallback_url
+
+
 def get_weather_forecast(lat: float, lng: float) -> dict:
     """Get 3-day weather forecast using WeatherAPI for detailed conditions"""
     try:
@@ -554,6 +590,15 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         trip_id = None
         if user:
             trip_id = f"{user['uid']}_{int(datetime.now().timestamp())}"
+            
+            # Get Unsplash cover image for the trip
+            print("Fetching Unsplash cover image...")
+            cover_image_url = get_unsplash_image(trip_request.destination)
+            if cover_image_url:
+                print(f"✓ Cover image fetched: {cover_image_url[:50]}...")
+            else:
+                print("⚠ No cover image found")
+            
             trip_data = {
                 "trip_id": trip_id,
                 "user_id": user['uid'],
@@ -576,15 +621,16 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
                 "views_count": 0,
                 "likes_count": 0,
                 "category_tags": trip_request.categories or [],
-                "cover_image": None,
+                "cover_image": cover_image_url,
             }
             
             # Save to user's trips subcollection
             firebase_db.collection("users").document(user['uid']).collection("trips").document(trip_id).set(trip_data)
             print(f"✓ Trip saved to Firestore: {trip_id}")
             
-            # Add trip_id to response
+            # Add trip_id and cover_image to response
             trip_plan["trip_id"] = trip_id
+            trip_plan["cover_image"] = cover_image_url
         
         return JSONResponse(content=trip_plan)
     
@@ -623,6 +669,7 @@ async def get_my_trips(user = Depends(get_current_user)):
                 "trip_name": trip_data.get("trip_plan", {}).get("trip_name", ""),
                 "rating": trip_data.get("rating", 0),
                 "activity_level": trip_data.get("activity_level", "medium"),
+                "cover_image": trip_data.get("cover_image"),
             })
         
         return JSONResponse(content={"trips": trips_list})
@@ -675,6 +722,10 @@ async def delete_trip(trip_id: str, user = Depends(get_current_user)):
 
 class RatingRequest(BaseModel):
     rating: int
+
+
+class ViewRequest(BaseModel):
+    user_id: str
 
 
 @app.put("/api/trip/{trip_id}/rating")
@@ -800,9 +851,31 @@ async def get_catalog_trips(
                         continue
                 
                 if category_tags:
+                    # Tag mapping for bilingual support
+                    tag_mapping = {
+                        "Văn hóa": ["Văn hóa", "culture"],
+                        "Phiêu lưu": ["Phiêu lưu", "adventure"],
+                        "Thư giãn": ["Thư giãn", "relaxation", "relax"],
+                        "Thiên nhiên": ["Thiên nhiên", "nature"],
+                        "Ẩm thực": ["Ẩm thực", "food"],
+                        "Mua sắm": ["Mua sắm", "shopping"],
+                        "Lịch sử": ["Lịch sử", "history"],
+                        "Giải trí đêm": ["Giải trí đêm", "nightlife"],
+                        "Nhiếp ảnh": ["Nhiếp ảnh", "photography"],
+                    }
                     tags = [t.strip() for t in category_tags.split(",")]
                     trip_tags = trip_data.get("category_tags", [])
-                    if not any(tag in trip_tags for tag in tags):
+                    # Expand filter tags to include all equivalent versions
+                    expanded_tags = []
+                    for tag in tags:
+                        if tag in tag_mapping:
+                            expanded_tags.extend(tag_mapping[tag])
+                        else:
+                            expanded_tags.append(tag)
+                    # Check if any trip tag matches any expanded filter tag (case-insensitive)
+                    trip_tags_lower = [t.lower() for t in trip_tags]
+                    expanded_tags_lower = [t.lower() for t in expanded_tags]
+                    if not any(t in trip_tags_lower for t in expanded_tags_lower):
                         continue
                 
                 if search:
@@ -819,6 +892,7 @@ async def get_catalog_trips(
                     "trip_id": trip_data.get("trip_id"),
                     "user_id": user_doc.id,
                     "username": user_info.get("displayName", "Anonymous"),
+                    "photoURL": user_info.get("photoURL", ""),
                     "destination": trip_data.get("destination"),
                     "duration": trip_data.get("duration"),
                     "budget": trip_data.get("budget"),
@@ -829,7 +903,7 @@ async def get_catalog_trips(
                     "cover_image": trip_data.get("cover_image"),
                     "views_count": trip_data.get("views_count", 0),
                     "likes_count": trip_data.get("likes_count", 0),
-                    "rating": trip_data.get("rating", 0),
+                    "rating": trip_data.get("rating") if trip_data.get("rating") and trip_data.get("rating") > 0 else None,
                     "published_at": trip_data.get("published_at", trip_data.get("created_at")),
                     "activity_level": trip_data.get("activity_level", "medium"),
                     "travel_group": trip_data.get("travel_group", "solo"),
@@ -865,7 +939,7 @@ async def get_catalog_trips(
 
 
 @app.post("/api/trip/{trip_id}/view")
-async def increment_trip_view(trip_id: str, user_id: str):
+async def increment_trip_view(trip_id: str, request: ViewRequest):
     """Increment view count for a public trip"""
     try:
         # Find the trip across all users
@@ -874,7 +948,7 @@ async def increment_trip_view(trip_id: str, user_id: str):
         for user_doc in users_ref:
             trip_ref = firebase_db.collection("users").document(user_doc.id).collection("trips").document(trip_id)
             trip_doc = trip_ref.get()
-            
+
             if trip_doc.exists:
                 trip_data = trip_doc.to_dict()
                 if trip_data.get("is_public", False):
@@ -894,9 +968,9 @@ async def increment_trip_view(trip_id: str, user_id: str):
         )
 
 
-@app.post("/api/trip/{trip_id}/like")
-async def toggle_trip_like(trip_id: str, user_id: str):
-    """Toggle like for a public trip"""
+@app.get("/api/public-trip/{trip_id}")
+async def get_public_trip(trip_id: str):
+    """Get a specific public trip by ID without authentication"""
     try:
         # Find the trip across all users
         users_ref = firebase_db.collection("users").stream()
@@ -908,11 +982,70 @@ async def toggle_trip_like(trip_id: str, user_id: str):
             if trip_doc.exists:
                 trip_data = trip_doc.to_dict()
                 if trip_data.get("is_public", False):
-                    # Check if user already liked (you could store this in a separate collection)
-                    # For simplicity, just toggle the count
-                    current_likes = trip_data.get("likes_count", 0)
-                    trip_ref.update({"likes_count": max(0, current_likes + 1)})
-                    return JSONResponse(content={"message": "Like toggled", "likes_count": current_likes + 1})
+                    # Get user info
+                    user_info = user_doc.to_dict()
+                    trip_data["username"] = user_info.get("displayName", "Anonymous")
+                    return JSONResponse(content=trip_data)
+        
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Public trip not found"}
+        )
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to fetch public trip", "details": str(e)}
+        )
+
+
+class LikeRequest(BaseModel):
+    user_id: str
+
+
+@app.post("/api/trip/{trip_id}/like")
+async def toggle_trip_like(trip_id: str, request: LikeRequest):
+    """Toggle like for a public trip and track in user profile"""
+    try:
+        # Find the trip across all users
+        users_ref = firebase_db.collection("users").stream()
+        
+        for user_doc in users_ref:
+            trip_ref = firebase_db.collection("users").document(user_doc.id).collection("trips").document(trip_id)
+            trip_doc = trip_ref.get()
+            
+            if trip_doc.exists:
+                trip_data = trip_doc.to_dict()
+                if trip_data.get("is_public", False):
+                    # Get user's liked trips
+                    user_ref = firebase_db.collection("users").document(request.user_id)
+                    user_snapshot = user_ref.get()
+                    
+                    if user_snapshot.exists:
+                        user_data = user_snapshot.to_dict()
+                        liked_trips = user_data.get("liked_trips", [])
+                        
+                        # Toggle like
+                        if trip_id in liked_trips:
+                            # Unlike
+                            liked_trips.remove(trip_id)
+                            current_likes = trip_data.get("likes_count", 0)
+                            trip_ref.update({"likes_count": max(0, current_likes - 1)})
+                            user_ref.update({"liked_trips": liked_trips})
+                            return JSONResponse(content={"message": "Unliked", "likes_count": max(0, current_likes - 1), "liked": False})
+                        else:
+                            # Like
+                            liked_trips.append(trip_id)
+                            current_likes = trip_data.get("likes_count", 0)
+                            trip_ref.update({"likes_count": current_likes + 1})
+                            user_ref.update({"liked_trips": liked_trips})
+                            return JSONResponse(content={"message": "Liked", "likes_count": current_likes + 1, "liked": True})
+                    else:
+                        # Create user profile and like
+                        user_ref.set({"liked_trips": [trip_id]})
+                        current_likes = trip_data.get("likes_count", 0)
+                        trip_ref.update({"likes_count": current_likes + 1})
+                        return JSONResponse(content={"message": "Liked", "likes_count": current_likes + 1, "liked": True})
         
         return JSONResponse(
             status_code=404,
@@ -923,4 +1056,204 @@ async def toggle_trip_like(trip_id: str, user_id: str):
         return JSONResponse(
             status_code=500,
             content={"error": "Failed to toggle like", "details": str(e)}
+        )
+
+
+@app.post("/api/admin/regenerate-cover-images")
+async def regenerate_cover_images(force: bool = False):
+    """Regenerate cover images for all public trips (force=True to update all)"""
+    try:
+        updated_count = 0
+        users_ref = firebase_db.collection("users").stream()
+        
+        for user_doc in users_ref:
+            trips_ref = firebase_db.collection("users").document(user_doc.id).collection("trips")
+            trips = trips_ref.where("is_public", "==", True).stream()
+            
+            for trip_doc in trips:
+                trip_data = trip_doc.to_dict()
+                
+                # Update if cover_image is missing OR force=True
+                if force or not trip_data.get("cover_image"):
+                    destination = trip_data.get("destination", "")
+                    print(f"Fetching cover image for: {destination}")
+                    
+                    cover_image_url = get_unsplash_image(destination)
+                    
+                    if cover_image_url:
+                        trip_ref = firebase_db.collection("users").document(user_doc.id).collection("trips").document(trip_doc.id)
+                        trip_ref.update({"cover_image": cover_image_url})
+                        updated_count += 1
+                        print(f"✓ Updated {destination}")
+                    else:
+                        print(f"⚠ No image found for {destination}")
+        
+        return JSONResponse(content={
+            "message": f"Successfully updated {updated_count} trips with cover images",
+            "updated_count": updated_count
+        })
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to regenerate cover images", "details": str(e)}
+        )
+
+
+@app.get("/api/user/profile")
+async def get_user_profile(user = Depends(get_current_user)):
+    """Get user profile information"""
+    try:
+        user_doc = firebase_db.collection("users").document(user['uid']).get()
+        
+        if not user_doc.exists:
+            # Create default profile
+            default_profile = {
+                "uid": user['uid'],
+                "email": user.get('email', ''),
+                "displayName": user.get('displayName', user.get('email', '').split('@')[0]),
+                "photoURL": user.get('photoURL', ''),
+                "bio": "",
+                "location": "",
+                "interests": [],
+                "created_at": datetime.now().isoformat()
+            }
+            firebase_db.collection("users").document(user['uid']).set(default_profile)
+            return JSONResponse(content=default_profile)
+        
+        profile_data = user_doc.to_dict()
+        # Merge with auth token data
+        profile_data['displayName'] = profile_data.get('displayName') or user.get('displayName', '')
+        profile_data['photoURL'] = profile_data.get('photoURL') or user.get('photoURL', '')
+        
+        # Convert ALL Firestore datetime objects to ISO strings recursively
+        def convert_datetimes(obj):
+            if isinstance(obj, dict):
+                return {k: convert_datetimes(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_datetimes(item) for item in obj]
+            elif hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            return obj
+        
+        profile_data = convert_datetimes(profile_data)
+        
+        return JSONResponse(content=profile_data)
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to fetch profile", "details": str(e)}
+        )
+
+
+@app.put("/api/user/profile")
+async def update_user_profile(
+    request: Request,
+    user = Depends(get_current_user)
+):
+    """Update user profile information"""
+    try:
+        # Get JSON body
+        body = await request.json()
+        
+        # Check if profile exists, create if not
+        user_ref = firebase_db.collection("users").document(user['uid'])
+        user_doc = user_ref.get()
+        
+        if not user_doc.exists:
+            # Create default profile first
+            default_profile = {
+                "uid": user['uid'],
+                "email": user.get('email', ''),
+                "displayName": user.get('displayName', user.get('email', '').split('@')[0]),
+                "photoURL": user.get('photoURL', ''),
+                "bio": "",
+                "location": "",
+                "interests": [],
+                "created_at": datetime.now().isoformat()
+            }
+            user_ref.set(default_profile)
+        
+        update_data = {}
+        if "displayName" in body and body["displayName"] is not None:
+            update_data["displayName"] = body["displayName"]
+        if "bio" in body and body["bio"] is not None:
+            update_data["bio"] = body["bio"]
+        if "location" in body and body["location"] is not None:
+            update_data["location"] = body["location"]
+        if "photoURL" in body and body["photoURL"] is not None:
+            update_data["photoURL"] = body["photoURL"]
+        
+        update_data["updated_at"] = datetime.now().isoformat()
+        
+        user_ref.update(update_data)
+        
+        # Fetch updated profile
+        updated_doc = user_ref.get()
+        profile_data = updated_doc.to_dict()
+        
+        # Convert ALL Firestore datetime objects to ISO strings recursively
+        def convert_datetimes(obj):
+            if isinstance(obj, dict):
+                return {k: convert_datetimes(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_datetimes(item) for item in obj]
+            elif hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            return obj
+        
+        profile_data = convert_datetimes(profile_data)
+        
+        return JSONResponse(content=profile_data)
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to update profile", "details": str(e)}
+        )
+
+
+@app.get("/api/user/liked-trips")
+async def get_liked_trips(user = Depends(get_current_user)):
+    """Get all trips that the user has liked"""
+    try:
+        # Get user's liked trips from their profile
+        user_doc = firebase_db.collection("users").document(user['uid']).get()
+        
+        if not user_doc.exists:
+            return JSONResponse(content={"trips": []})
+        
+        user_data = user_doc.to_dict()
+        liked_trip_ids = user_data.get("liked_trips", [])
+        
+        if not liked_trip_ids:
+            return JSONResponse(content={"trips": []})
+        
+        # Fetch trip details
+        trips = []
+        users_ref = firebase_db.collection("users").stream()
+        
+        for user_iter in users_ref:
+            for trip_id in liked_trip_ids:
+                trip_ref = firebase_db.collection("users").document(user_iter.id).collection("trips").document(trip_id)
+                trip_doc = trip_ref.get()
+                
+                if trip_doc.exists:
+                    trip_data = trip_doc.to_dict()
+                    if trip_data.get("is_public", False):
+                        trips.append({
+                            "trip_id": trip_data.get("trip_id"),
+                            "destination": trip_data.get("destination"),
+                            "duration": trip_data.get("duration"),
+                            "trip_name": trip_data.get("trip_plan", {}).get("trip_name", ""),
+                            "cover_image": trip_data.get("cover_image")
+                        })
+        
+        return JSONResponse(content={"trips": trips})
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to fetch liked trips", "details": str(e)}
         )

@@ -1,6 +1,9 @@
 .gitignore
 key/
 *.json
+.package-lock exceptions
+!package-lock.json
+!frontend/package-lock.json
 .env
 __pycache__/
 .vscode/

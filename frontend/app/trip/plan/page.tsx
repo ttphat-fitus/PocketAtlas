@@ -75,6 +75,7 @@ interface TripPlan {
   packing_list: string[];
   travel_tips: string[];
   weather_forecast?: WeatherForecast[];
+  cover_image?: string;
 }
 
 // Helper function to parse time string (e.g., "08:00" or "08:00 - 10:00")
@@ -542,77 +543,107 @@ export default function TripPlanPage() {
         {/* Header Card */}
         <div className="card bg-white shadow-xl mb-8">
           <div className="card-body">
-            {/* Title - Full Width */}
+            {/* Cover Image */}
+            {tripPlan.cover_image && (
+              <div className="relative h-64 w-full rounded-xl overflow-hidden mb-6">
+                <img
+                  src={tripPlan.cover_image}
+                  alt={tripPlan.trip_name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+              </div>
+            )}
+
+            {/* Title */}
             <h2 className="text-3xl font-bold mb-6">{tripPlan.trip_name}</h2>
             
-            {/* Time, Budget, Activity Badges Row - Only 3 badges */}
-            <div className="flex flex-wrap gap-3 mb-6">
+            {/* 6 Badges in One Row - Fill Width */}
+            <div className="flex gap-2 mb-6">
+              {/* Total Cost Card - Larger */}
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg border-2 border-blue-300 shadow-sm flex-1 min-w-0">
+                <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <div className="min-w-0">
+                  <div className="text-[10px] text-blue-600 font-semibold">{language === "en" ? "Total Cost" : "Tổng chi phí"}</div>
+                  <div className="font-bold text-gray-800 text-sm truncate">
+                    {tripPlan.total_estimated_cost.replace(/đ/g, '₫').replace(/VND/g, '₫')}
+                  </div>
+                </div>
+              </div>
+
               {tripParams && (
                 <>
-                  {/* Time Badge - Pink */}
-                  <div className="flex items-center gap-2 px-4 py-3 bg-pink-50 rounded-xl border border-pink-200">
-                    <svg className="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {/* Time Badge */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-2.5 bg-pink-50 rounded-lg border border-pink-200 flex-1 min-w-0">
+                    <svg className="w-4 h-4 text-pink-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <div>
-                      <div className="text-xs text-pink-600">{language === "en" ? "Time" : "Thời gian"}</div>
-                      <div className="font-bold text-gray-800">{tripParams.duration} {language === "en" ? "day" : "ngày"}</div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-pink-600 font-medium">{language === "en" ? "Time" : "Thời gian"}</div>
+                      <div className="font-bold text-gray-800 text-xs truncate">{tripParams.duration} {language === "en" ? "day" : "ngày"}</div>
                     </div>
                   </div>
 
-                  {/* Budget Badge - Green */}
-                  <div className="flex items-center gap-2 px-4 py-3 bg-green-50 rounded-xl border border-green-200">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {/* Budget Badge */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-2.5 bg-green-50 rounded-lg border border-green-200 flex-1 min-w-0">
+                    <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <div>
-                      <div className="text-xs text-green-600">{language === "en" ? "Budget" : "Ngân sách"}</div>
-                      <div className="font-bold text-gray-800">{tripParams.budget === "low" ? (language === "en" ? "Low" : "Thấp") : tripParams.budget === "medium" ? (language === "en" ? "Medium" : "Trung bình") : (language === "en" ? "High" : "Cao")}</div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-green-600 font-medium">{language === "en" ? "Budget" : "Ngân sách"}</div>
+                      <div className="font-bold text-gray-800 text-xs truncate">{tripParams.budget === "low" ? (language === "en" ? "Low" : "Thấp") : tripParams.budget === "medium" ? (language === "en" ? "Medium" : "Trung bình") : (language === "en" ? "High" : "Cao")}</div>
                     </div>
                   </div>
 
-                  {/* Activity Badge - Purple */}
-                  <div className="flex items-center gap-2 px-4 py-3 bg-purple-50 rounded-xl border border-purple-200">
-                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {/* Activity Badge */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-2.5 bg-purple-50 rounded-lg border border-purple-200 flex-1 min-w-0">
+                    <svg className="w-4 h-4 text-purple-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    <div>
-                      <div className="text-xs text-purple-600">{language === "en" ? "Activity" : "Hoạt động"}</div>
-                      <div className="font-bold text-gray-800">{tripParams.activity_level === "low" ? (language === "en" ? "Low" : "Thấp") : tripParams.activity_level === "medium" ? (language === "en" ? "Medium" : "Trung bình") : (language === "en" ? "High" : "Cao")}</div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-purple-600 font-medium">{language === "en" ? "Activity" : "Hoạt động"}</div>
+                      <div className="font-bold text-gray-800 text-xs truncate">{tripParams.activity_level === "low" ? (language === "en" ? "Low" : "Thấp") : tripParams.activity_level === "medium" ? (language === "en" ? "Medium" : "Trung bình") : (language === "en" ? "High" : "Cao")}</div>
                     </div>
                   </div>
                 </>
               )}
+
+              {/* Packing List Button - Compact */}
+              <button
+                onClick={() => setShowPackingList(!showPackingList)}
+                className={`flex items-center gap-1.5 px-3 py-2.5 bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg border transition-all ${
+                  showPackingList 
+                    ? 'border-orange-400 shadow-md scale-105' 
+                    : 'border-orange-200 hover:shadow-sm hover:border-orange-300'
+                }`}
+              >
+                <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                <span className="font-bold text-orange-700 text-sm">{tripPlan.packing_list?.length || 0}</span>
+              </button>
+
+              {/* Travel Tips Button - Compact */}
+              <button
+                onClick={() => setShowTips(!showTips)}
+                className={`flex items-center gap-1.5 px-3 py-2.5 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg border transition-all ${
+                  showTips 
+                    ? 'border-teal-400 shadow-md scale-105' 
+                    : 'border-teal-200 hover:shadow-sm hover:border-teal-300'
+                }`}
+              >
+                <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                <span className="font-bold text-teal-700 text-sm">{tripPlan.travel_tips?.length || 0}</span>
+              </button>
             </div>
-            
-            {/* Overview and Price/Buttons - Side by Side */}
-            <div className="flex flex-col md:flex-row justify-between items-start gap-6">
-              <div className="flex-1">
-                <p className="text-gray-600 leading-relaxed">{tripPlan.overview}</p>
-              </div>
-              
-              <div className="flex flex-col gap-2 md:min-w-[280px]">
-                {/* Total Cost */}
-                <div className="bg-white border-2 border-gray-200 rounded-xl p-4 text-center shadow-sm">
-                  <div className="text-lg font-bold text-indigo-600">
-                    {tripPlan.total_estimated_cost}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    className="btn btn-outline btn-sm flex-1"
-                    onClick={() => setShowPackingList(!showPackingList)}
-                  >
-                    {t("plan.packingList")}
-                  </button>
-                  <button
-                    className="btn btn-outline btn-sm flex-1"
-                    onClick={() => setShowTips(!showTips)}
-                  >
-                    {t("plan.travelTips")}
-                  </button>
-                </div>
-              </div>
+
+            {/* Overview */}
+            <div className="mt-6">
+              <p className="text-gray-600 leading-relaxed">{tripPlan.overview}</p>
             </div>
 
           </div>
@@ -674,40 +705,7 @@ export default function TripPlanPage() {
           </div>
         )}
 
-        {/* Packing List */}
-        {showPackingList && tripPlan.packing_list && (
-          <div className="mt-12 card bg-white shadow-xl">
-            <div className="card-body">
-              <h3 className="text-2xl font-bold mb-4 text-gray-800">
-                {t("plan.packingList.title")}
-              </h3>
-              <ul className="list-disc list-inside grid grid-cols-1 md:grid-cols-2 gap-2">
-                {tripPlan.packing_list.map((item, idx) => (
-                  <li key={idx} className="text-gray-700">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {/* Travel Tips */}
-        {showTips && tripPlan.travel_tips && (
-          <div className="mt-12 card bg-white shadow-xl">
-            <div className="card-body">
-              <h3 className="text-2xl font-bold mb-4 text-gray-800">{t("plan.travelTips.title")}</h3>
-              <ul className="list-disc list-inside space-y-2">
-                {tripPlan.travel_tips.map((tip, idx) => (
-                  <li key={idx} className="text-gray-700">
-                    {tip}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-
+        {/* Schedule Section */}
         <div className="mt-12 grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Day Selector Sidebar */}
           <div className="lg:col-span-1">
@@ -730,6 +728,53 @@ export default function TripPlanPage() {
                   ))}
                 </div>
               </div>
+            </div>
+            
+            {/* Items and Tips boxes - directly under Schedule */}
+            <div className="mt-4 space-y-4">
+              {showPackingList && tripPlan.packing_list && (
+                <div className="card bg-white shadow-lg">
+                  <div className="card-body p-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                      </svg>
+                      <h3 className="text-sm font-bold text-gray-800">
+                        {t("plan.packingList.title")}
+                      </h3>
+                    </div>
+                    <ul className="list-disc list-inside space-y-0.5 text-xs">
+                      {tripPlan.packing_list.map((item, idx) => (
+                        <li key={idx} className="text-gray-700">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {showTips && tripPlan.travel_tips && (
+                <div className="card bg-white shadow-lg">
+                  <div className="card-body p-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      <h3 className="text-sm font-bold text-gray-800">{t("plan.travelTips.title")}</h3>
+                    </div>
+                    <ul className="list-disc list-inside space-y-1.5 text-xs">
+                      {tripPlan.travel_tips.map((tip, idx) => (
+                        <li key={idx} className="text-gray-700" dangerouslySetInnerHTML={{
+                          __html: tip
+                            .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+                            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+                        }} />
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -793,6 +838,8 @@ export default function TripPlanPage() {
             )}
           </div>
         </div>
+
+
       </div>
     </div>
   );

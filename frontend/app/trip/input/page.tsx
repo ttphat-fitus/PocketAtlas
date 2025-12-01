@@ -350,15 +350,15 @@ export default function TripInputPage() {
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { value: "cultural", label: language === "en" ? "Cultural" : "Văn hóa" },
-                    { value: "nature", label: language === "en" ? "Nature" : "Thiên nhiên" },
-                    { value: "food", label: language === "en" ? "Food" : "Ẩm thực" },
-                    { value: "adventure", label: language === "en" ? "Adventure" : "Phiêu lưu" },
-                    { value: "shopping", label: language === "en" ? "Shopping" : "Mua sắm" },
-                    { value: "nightlife", label: language === "en" ? "Nightlife" : "Giải trí đêm" },
-                    { value: "relaxation", label: language === "en" ? "Relaxation" : "Thư giãn" },
-                    { value: "history", label: language === "en" ? "History" : "Lịch sử" },
-                    { value: "photography", label: language === "en" ? "Photography" : "Nhiếp ảnh" },
+                    { value: "Văn hóa", label: language === "en" ? "Culture" : "Văn hóa" },
+                    { value: "Thiên nhiên", label: language === "en" ? "Nature" : "Thiên nhiên" },
+                    { value: "Ẩm thực", label: language === "en" ? "Food" : "Ẩm thực" },
+                    { value: "Phiêu lưu", label: language === "en" ? "Adventure" : "Phiêu lưu" },
+                    { value: "Mua sắm", label: language === "en" ? "Shopping" : "Mua sắm" },
+                    { value: "Giải trí đêm", label: language === "en" ? "Nightlife" : "Giải trí đêm" },
+                    { value: "Thư giãn", label: language === "en" ? "Relaxation" : "Thư giãn" },
+                    { value: "Lịch sử", label: language === "en" ? "History" : "Lịch sử" },
+                    { value: "Nhiếp ảnh", label: language === "en" ? "Photography" : "Nhiếp ảnh" },
                   ].map((cat) => (
                     <label key={cat.value} className="label cursor-pointer justify-start gap-2">
                       <input

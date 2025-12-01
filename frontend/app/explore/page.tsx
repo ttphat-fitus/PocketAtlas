@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "../../contexts/LanguageContext";
 import TripCard from "../../components/TripCard";
 
@@ -25,20 +26,21 @@ interface PublicTrip {
 }
 
 const CATEGORIES = [
-  "Cultural",
-  "Adventure",
-  "Relax",
-  "Nature",
-  "Food",
-  "Shopping",
-  "Beach",
-  "Mountain",
-  "City",
-  "Historical",
+  "Văn hóa",
+  "Phiêu lưu",
+  "Thư giãn",
+  "Thiên nhiên",
+  "Ẩm thực",
+  "Mua sắm",
+  "Lịch sử",
+  "Giải trí đêm",
+  "Nhiếp ảnh",
 ];
 
 export default function ExplorePage() {
   const { t } = useLanguage();
+  const { setLanguage, language } = useLanguage();
+  const router = useRouter();
   const [trips, setTrips] = useState<PublicTrip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -95,6 +97,33 @@ export default function ExplorePage() {
     fetchTrips();
   }, [page, selectedDuration, selectedBudget, selectedCategories, sortBy]);
 
+  const handleRandomTrip = async () => {
+    try {
+      setLoading(true);
+      // fetch a larger list of trips matching current filters
+      const params = new URLSearchParams({ page: "1", limit: "100", sort_by: sortBy });
+      if (selectedDuration) params.append("duration", selectedDuration);
+      if (selectedBudget) params.append("budget", selectedBudget);
+      if (selectedCategories.length > 0) params.append("category_tags", selectedCategories.join(","));
+      if (searchQuery) params.append("search", searchQuery);
+
+      const res = await fetch(`http://localhost:8000/api/catalog/trips?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch trips");
+      const data = await res.json();
+      const list: PublicTrip[] = data.trips || [];
+      if (!list || list.length === 0) {
+        setError(t("no_trips_found") || "No trip found");
+        return;
+      }
+      const pick = list[Math.floor(Math.random() * list.length)];
+      router.push(`/trip/explore/${pick.trip_id}?userId=${pick.user_id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No trip found");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
@@ -125,8 +154,52 @@ export default function ExplorePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+      {/* Navbar */}
+      <div className="navbar bg-white shadow-md sticky top-0 z-50">
+        <div className="navbar-start">
+          <button
+            onClick={() => router.push("/")}
+            className="btn btn-ghost btn-sm ml-2 gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            {language === "en" ? "Back" : "Quay lại"}
+          </button>
+        </div>
+        <div className="navbar-center">
+          <h1 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600">
+            {t("explore_trips") || "Khám Phá"}
+          </h1>
+        </div>
+        <div className="navbar-end mr-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setLanguage("en")}
+              className={`btn btn-sm ${
+                language === "en"
+                  ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0 hover:from-blue-600 hover:to-purple-600"
+                  : "btn-ghost"
+              }`}
+            >
+              EN
+            </button>
+            <button
+              onClick={() => setLanguage("vi")}
+              className={`btn btn-sm ${
+                language === "vi"
+                  ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0 hover:from-blue-600 hover:to-purple-600"
+                  : "btn-ghost"
+              }`}
+            >
+              VI
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12">
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12 relative">
         <div className="container mx-auto px-4">
           <h1 className="text-4xl font-bold mb-2">
             {t("explore_trips") || "Khám Phá Chuyến Đi"}
@@ -166,7 +239,22 @@ export default function ExplorePage() {
               </button>
             </div>
           </form>
+
+          {/* Random Trip Button */}
+          <div className="mt-4">
+            <button
+              onClick={handleRandomTrip}
+              className="btn btn-outline btn-sm"
+              title={t("random_trip") || "Random trip"}
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {t("random_trip") || "Random"}
+            </button>
+          </div>
         </div>
+
       </div>
 
       <div className="container mx-auto px-4 py-8">
@@ -250,7 +338,7 @@ export default function ExplorePage() {
                         onChange={() => handleCategoryToggle(category)}
                       />
                       <span className="badge badge-sm peer-checked:badge-primary">
-                        {category}
+                        {language === "en" ? t(category) || category : category}
                       </span>
                     </label>
                   ))}

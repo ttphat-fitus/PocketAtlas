@@ -17,6 +17,8 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         return {
             "uid": decoded_token.get("uid"),
             "email": decoded_token.get("email"),
+            "displayName": decoded_token.get("name") or decoded_token.get("email", "").split("@")[0],
+            "photoURL": decoded_token.get("picture", ""),
             "is_anonymous": decoded_token.get("firebase", {}).get("sign_in_provider") == "anonymous",
         }
     except Exception as e:

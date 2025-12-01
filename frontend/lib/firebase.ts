@@ -54,4 +54,12 @@ if (!getApps().length && isConfigured) {
   db = {} as Firestore;
 }
 
+// Helper function to get ID token
+export async function getIdToken(): Promise<string> {
+  if (!auth.currentUser) {
+    throw new Error("No authenticated user");
+  }
+  return await auth.currentUser.getIdToken();
+}
+
 export { app, auth, db, isConfigured };

@@ -16,6 +16,7 @@ interface TripSummary {
   trip_name: string;
   rating?: number;
   activity_level?: string;
+  cover_image?: string;
 }
 
 // Format date as dd/mm/yyyy
@@ -378,7 +379,17 @@ export default function MyTripsPage() {
                 endDate.setDate(endDate.getDate() + trip.duration - 1);
 
                 return (
-                  <div key={trip.trip_id} className="card bg-white shadow-md hover:shadow-lg transition-shadow">
+                  <div key={trip.trip_id} className="card bg-white shadow-md hover:shadow-lg transition-shadow overflow-hidden">
+                    {trip.cover_image && (
+                      <figure className="h-48 relative">
+                        <img
+                          src={trip.cover_image}
+                          alt={trip.trip_name || trip.destination}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+                      </figure>
+                    )}
                     <div className="card-body p-6">
                       <div className="text-xs text-gray-400 mb-3">
                         {language === "en" ? `Created: ${formatDate(trip.created_at)}` : `Tạo lúc: ${formatDate(trip.created_at)}`}
@@ -424,10 +435,10 @@ export default function MyTripsPage() {
 
                       {/* Timeline */}
                       <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between text-sm">
                           <div className="text-center">
                             <div className="text-xs text-gray-500 mb-1">{language === "en" ? "Start Date" : "Ngày bắt đầu"}</div>
-                            <div className="badge badge-primary badge-lg font-bold px-4 py-3">
+                            <div className="badge badge-primary badge-sm font-bold px-2 py-1.5 text-[10px]">
                               {formatDate(trip.start_date)}
                             </div>
                           </div>
@@ -438,7 +449,7 @@ export default function MyTripsPage() {
                               <div className="absolute top-1/2 right-0 -translate-y-1/2 w-3 h-3 bg-green-500 rounded-full"></div>
                             </div>
                             <div className="text-center mt-2">
-                              <div className="inline-flex items-center gap-1 text-xs font-medium text-gray-600">
+                              <div className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-600">
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                                 </svg>
@@ -448,7 +459,7 @@ export default function MyTripsPage() {
                           </div>
                           <div className="text-center">
                             <div className="text-xs text-gray-500 mb-1">{language === "en" ? "End Date" : "Ngày kết thúc"}</div>
-                            <div className="badge badge-success badge-lg font-bold px-4 py-3">
+                            <div className="badge badge-success badge-sm font-bold px-2 py-1.5 text-[10px]">
                               {formatDate(endDate.toISOString())}
                             </div>
                           </div>
