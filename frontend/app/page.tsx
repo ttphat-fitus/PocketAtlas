@@ -9,7 +9,7 @@ export default function LandingPage() {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
   const { user, loading, signOut } = useAuth();
-  
+
   const destinations: string[] = [
     "Hà Nội",
     "Đà Nẵng",
@@ -60,7 +60,7 @@ export default function LandingPage() {
                 VI
               </button>
             </div>
-            
+
             {/* Navigation Links */}
             <div className="divider divider-horizontal mx-1"></div>
             <a href="/explore" className="btn btn-ghost btn-sm font-semibold">
@@ -96,7 +96,10 @@ export default function LandingPage() {
               <a href="/trip/input" className="btn btn-primary btn-sm">
                 {t("home.planTrip.button")}
               </a>
-              <button onClick={() => signOut()} className="btn btn-ghost btn-sm">
+              <button
+                onClick={() => signOut()}
+                className="btn btn-ghost btn-sm"
+              >
                 {language === "en" ? "Sign Out" : "Đăng xuất"}
               </button>
             </div>
@@ -141,9 +144,7 @@ export default function LandingPage() {
             <div className="card-body items-center text-center">
               <div className="text-4xl mb-2">🗺️</div>
               <h3 className="card-title text-lg">{t("home.feature1.title")}</h3>
-              <p className="text-sm text-gray-600">
-                {t("home.feature1.desc")}
-              </p>
+              <p className="text-sm text-gray-600">{t("home.feature1.desc")}</p>
             </div>
           </div>
 
@@ -151,9 +152,7 @@ export default function LandingPage() {
             <div className="card-body items-center text-center">
               <div className="text-4xl mb-2">📍</div>
               <h3 className="card-title text-lg">{t("home.feature2.title")}</h3>
-              <p className="text-sm text-gray-600">
-                {t("home.feature2.desc")}
-              </p>
+              <p className="text-sm text-gray-600">{t("home.feature2.desc")}</p>
             </div>
           </div>
 
@@ -161,9 +160,7 @@ export default function LandingPage() {
             <div className="card-body items-center text-center">
               <div className="text-4xl mb-2">✨</div>
               <h3 className="card-title text-lg">{t("home.feature3.title")}</h3>
-              <p className="text-sm text-gray-600">
-                {t("home.feature3.desc")}
-              </p>
+              <p className="text-sm text-gray-600">{t("home.feature3.desc")}</p>
             </div>
           </div>
         </div>
