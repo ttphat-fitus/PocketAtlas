@@ -184,13 +184,30 @@ def get_place_details(place_name: str, location: str) -> dict:
         
         headers = {"User-Agent": "PocketAtlas/1.0"}
         
-        # Step 1: Google Places Text Search
+        # Get location coordinates for bias (improve accuracy)
+        location_bias = ""
+        try:
+            geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
+            geocode_params = {"address": location, "key": GOOGLE_MAPS_API_KEY}
+            geocode_resp = requests.get(geocode_url, params=geocode_params, timeout=5)
+            geocode_data = geocode_resp.json()
+            if geocode_data.get("results"):
+                geo_loc = geocode_data["results"][0]["geometry"]["location"]
+                location_bias = f"point:{geo_loc['lat']},{geo_loc['lng']}"
+        except:
+            pass
+        
+        # Step 1: Google Places Text Search with location bias
         search_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
         search_params = {
             "query": f"{q} {location}",
             "key": GOOGLE_MAPS_API_KEY,
             "language": "vi"
         }
+        
+        # Add location bias if available (prioritizes results near destination)
+        if location_bias:
+            search_params["locationbias"] = location_bias
         
         resp = requests.get(search_url, params=search_params, timeout=10, headers=headers)
         data = resp.json()
@@ -296,6 +313,68 @@ def get_place_details(place_name: str, location: str) -> dict:
             "photo_url": "", "lat": 0, "lng": 0, "types": [], "price_level": 0,
             "weather": {"forecasts": []}, "phone": "", "website": "", "opening_hours": [],
             "reviews": [], "google_maps_link": ""
+        }
+
+
+def calculate_user_badges(uid: str) -> dict:
+    """Calculate user badges based on activity"""
+    try:
+        user_ref = firebase_db.collection("users").document(uid)
+        trips_ref = user_ref.collection("trips")
+        
+        # Count public trips
+        public_trips = trips_ref.where("is_public", "==", True).stream()
+        public_count = sum(1 for _ in public_trips)
+        
+        # Count total trips
+        all_trips = trips_ref.stream()
+        total_trips = sum(1 for _ in all_trips)
+        
+        # Calculate total likes received on public trips
+        total_likes = 0
+        public_trips_stream = trips_ref.where("is_public", "==", True).stream()
+        for trip in public_trips_stream:
+            trip_data = trip.to_dict()
+            total_likes += len(trip_data.get("liked_by", []))
+        
+        # Calculate badges
+        badges = []
+        if total_trips >= 20:
+            badges.append("Explorer")
+        if total_trips >= 50:
+            badges.append("Veteran Traveler")
+        if public_count >= 10:
+            badges.append("Local Guide")
+        if total_likes >= 100:
+            badges.append("Top Reviewer")
+        
+        # Calculate stars (1 star per public trip, max 5 stars display)
+        stars = min(public_count, 5)
+        
+        stats = {
+            "total_trips": total_trips,
+            "public_trips": public_count,
+            "total_likes": total_likes,
+            "badges": badges,
+            "stars": stars
+        }
+        
+        # Update user profile with stats
+        user_ref.update({
+            "stats": stats,
+            "updated_at": datetime.now().isoformat()
+        })
+        
+        return stats
+    
+    except Exception as e:
+        print(f"Error calculating badges: {e}")
+        return {
+            "total_trips": 0,
+            "public_trips": 0,
+            "total_likes": 0,
+            "badges": [],
+            "stars": 0
         }
 
 
@@ -521,18 +600,28 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         json_str = match.group(1) or match.group(2)
         trip_plan = json.loads(json_str)
         
-        # Get destination weather forecast for trip dates
+        # Get destination weather forecast for trip dates (only if within 7 days)
         destination_weather = []
         try:
-            geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
-            geocode_params = {"address": trip_request.destination, "key": GOOGLE_MAPS_API_KEY}
-            geo_resp = requests.get(geocode_url, params=geocode_params, timeout=5)
-            geo_data = geo_resp.json()
+            from datetime import datetime, timedelta
+            start_date = datetime.strptime(trip_request.start_date, "%Y-%m-%d")
+            today = datetime.now()
+            days_until_trip = (start_date - today).days
             
-            if geo_data.get("results"):
-                location = geo_data["results"][0]["geometry"]["location"]
-                weather_data = get_weather_forecast(location["lat"], location["lng"])
-                forecasts = weather_data.get("forecasts", [])
+            # Only fetch weather if trip starts within 7 days
+            if 0 <= days_until_trip <= 7:
+                geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
+                geocode_params = {"address": trip_request.destination, "key": GOOGLE_MAPS_API_KEY}
+                geo_resp = requests.get(geocode_url, params=geocode_params, timeout=5)
+                geo_data = geo_resp.json()
+                
+                if geo_data.get("results"):
+                    location = geo_data["results"][0]["geometry"]["location"]
+                    weather_data = get_weather_forecast(location["lat"], location["lng"])
+                    forecasts = weather_data.get("forecasts", [])
+            else:
+                print(f"⚠ Trip starts in {days_until_trip} days - beyond weather forecast range, skipping weather fetch")
+                forecasts = []
                 
                 # Match weather to trip dates
                 from datetime import datetime, timedelta
@@ -792,9 +881,13 @@ async def toggle_trip_public(trip_id: str, request: TogglePublicRequest, user = 
         
         trip_ref.update(update_data)
         
+        # Recalculate user badges and stats
+        user_stats = calculate_user_badges(user['uid'])
+        
         return JSONResponse(content={
             "message": "Trip visibility updated",
-            "is_public": request.is_public
+            "is_public": request.is_public,
+            "user_stats": user_stats
         })
     
     except Exception as e:
@@ -1116,6 +1209,13 @@ async def get_user_profile(user = Depends(get_current_user)):
                 "bio": "",
                 "location": "",
                 "interests": [],
+                "stats": {
+                    "total_trips": 0,
+                    "public_trips": 0,
+                    "total_likes": 0,
+                    "badges": [],
+                    "stars": 0
+                },
                 "created_at": datetime.now().isoformat()
             }
             firebase_db.collection("users").document(user['uid']).set(default_profile)
@@ -1125,6 +1225,10 @@ async def get_user_profile(user = Depends(get_current_user)):
         # Merge with auth token data
         profile_data['displayName'] = profile_data.get('displayName') or user.get('displayName', '')
         profile_data['photoURL'] = profile_data.get('photoURL') or user.get('photoURL', '')
+        
+        # Calculate and include user stats/badges
+        user_stats = calculate_user_badges(user['uid'])
+        profile_data['stats'] = user_stats
         
         # Convert ALL Firestore datetime objects to ISO strings recursively
         def convert_datetimes(obj):
