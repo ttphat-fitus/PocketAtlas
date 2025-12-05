@@ -3,19 +3,24 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useLanguage } from "../../../../contexts/LanguageContext";
+import RouteMap from "../../../../components/RouteMap";
+
+interface PlaceDetails {
+  name: string;
+  address: string;
+  rating: number;
+  photo_url: string;
+  lat?: number;
+  lng?: number;
+  google_maps_link?: string;
+}
 
 interface Activity {
   time: string;
   place: string;
   description: string;
   estimated_cost: string;
-  place_details?: {
-    name: string;
-    address: string;
-    rating: number;
-    photo_url: string;
-    google_maps_link?: string;
-  };
+  place_details?: PlaceDetails;
 }
 
 interface Day {
@@ -282,6 +287,23 @@ export default function ExploreDetailPage() {
           <div className="card-body">
             <h2 className="text-2xl font-bold mb-6">{currentDay.title}</h2>
 
+            {/* Route Map */}
+            {currentDay.activities.some(a => a.place_details?.lat && a.place_details?.lng) && (
+              <div className="mb-6">
+                <RouteMap
+                  locations={currentDay.activities
+                    .filter(a => a.place_details?.lat && a.place_details?.lng)
+                    .map(a => ({
+                      lat: a.place_details!.lat!,
+                      lng: a.place_details!.lng!,
+                      name: a.place,
+                      time: a.time,
+                    }))}
+                  height="300px"
+                />
+              </div>
+            )}
+
             <div className="space-y-4">
               {currentDay.activities.map((activity, idx) => (
                 <div key={idx} className="card bg-base-100 border border-gray-200">
@@ -307,7 +329,7 @@ export default function ExploreDetailPage() {
                         </div>
                         <p className="text-gray-600 mt-2">{activity.description}</p>
                         <p className="text-sm text-green-600 font-semibold mt-2">
-                          {activity.estimated_cost}
+                          {activity.estimated_cost?.replace(/VND/g, '₫').replace(/đ/g, '₫') || 'Miễn phí'}
                         </p>
                       </div>
                       {activity.place_details?.photo_url && (
