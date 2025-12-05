@@ -2,9 +2,7 @@
 
 > An intelligent AI-powered travel itinerary generator that creates personalized day-by-day trip plans. Simply provide your destination, travel dates, preferences, and budget—the app leverages Google Gemini AI to generate comprehensive itineraries and enriches locations with TrackAsia geocoding API (addresses, coordinates, ratings, photos, and map links).
 
-This repository contains a Next.js 16 frontend with TypeScript and a FastAPI backend that orchestrates AI-powered trip generation with real-world location data.
-
-## ✨ Key Features
+## Key Features
 
 ### Trip Planning
 - **AI-Powered Generation**: Multi-day, day-by-day itineraries using Google Gemini AI
@@ -108,30 +106,7 @@ npm run dev
 
 The app will be available at `http://localhost:3000`
 
-
-
-## 📡 API Endpoints
-
-### Trip Planning
-- `POST /api/plan-trip` - Generate new AI trip itinerary (supports auth)
-- `POST /api/plan-trip-stream` - Stream trip generation (real-time updates)
-
-### Trip Management
-- `GET /api/my-trips` - Get all user's saved trips (requires auth)
-- `GET /api/trip/{trip_id}` - Get specific trip details (requires auth)
-- `PUT /api/trip/{trip_id}` - Update trip details (requires auth)
-- `PUT /api/trip/{trip_id}/rating` - Update trip rating (requires auth)
-- `POST /api/trip/{trip_id}/toggle-public` - Toggle trip public/private (requires auth)
-- `DELETE /api/trip/{trip_id}` - Delete trip (requires auth)
-
-### Public Catalog
-- `GET /api/public-trips` - Get all public trips (no auth)
-- `GET /api/public-trips/{trip_id}` - Get specific public trip (no auth)
-
-### Health Check
-- `GET /` - API health check
-
-## 🛠️ Technologies Used
+## Technologies Used
 
 ### Frontend
 - **Framework**: Next.js 16 (App Router)
@@ -151,7 +126,7 @@ The app will be available at `http://localhost:3000`
 - **HTTP Client**: Requests
 - **ASGI Server**: Uvicorn
 
-## 🎨 Features in Detail
+## Features in Detail
 
 ### Trip Generation Flow
 1. User enters destination, dates, budget, and preferences
@@ -171,16 +146,7 @@ Each trip contains:
 - **Weather Forecast**: Daily weather predictions
 - **Cost Estimate**: Budget breakdown by day
 
-## 🔒 Security Considerations
-
-- API keys stored in separate JSON files (not in git)
-- Firebase Admin SDK for secure backend authentication
-- Firestore security rules for data access control
-- CORS configured for production domains
-- Anonymous users have limited access
-- Token validation on protected endpoints
-
-## 📝 Development
+## Development
 
 ### Run in Development Mode
 ```bash
