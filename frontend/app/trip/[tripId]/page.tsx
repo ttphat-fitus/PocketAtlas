@@ -5,6 +5,14 @@ import { useRouter, useParams } from "next/navigation";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useAuth } from "../../../contexts/AuthContext";
 import StarRating from "../../../components/StarRating";
+import dynamic from "next/dynamic";
+
+// Dynamic import for RouteMap to avoid SSR issues
+const RouteMap = dynamic(() => import("../../../components/RouteMap"), {
+  ssr: false,
+  loading: () => <div className="h-96 bg-gray-200 rounded-lg animate-pulse"></div>,
+});
+
 import {
   DndContext,
   closestCenter,
@@ -230,7 +238,7 @@ function SortableActivity({ activity, id, language }: { activity: Activity; id: 
                     </div>
                   )}
                 </div>
-                <div className="badge badge-success">{activity.estimated_cost}</div>
+                <div className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full whitespace-nowrap">{activity.estimated_cost}</div>
               </div>
               <p className="text-gray-700 text-sm mb-2">{activity.description}</p>
               {activity.tips && (
@@ -261,6 +269,10 @@ export default function TripDetailPage() {
   const [error, setError] = useState("");
   const [rating, setRating] = useState(0);
   const [ratingUpdating, setRatingUpdating] = useState(false);
+  const [showCoverImageModal, setShowCoverImageModal] = useState(false);
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [coverImageUpdating, setCoverImageUpdating] = useState(false);
+  const [coverImageLoaded, setCoverImageLoaded] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -296,9 +308,20 @@ export default function TripDetailPage() {
         }
 
         const data = await response.json();
+        console.log("Trip data fetched:", data);
+        
+        // Extract cover image from either location
+        const coverImage = data.trip_plan?.cover_image || data.cover_image || "";
+        console.log("Cover image URL:", coverImage);
+        console.log("Trip plan structure:", data.trip_plan);
+        
         setTripData(data);
-        setTripPlan(data.trip_plan);
+        // Ensure tripPlan has cover_image
+        const planWithCover = { ...data.trip_plan, cover_image: coverImage };
+        setTripPlan(planWithCover);
         setRating(data.rating || 0);
+        setCoverImageUrl(coverImage);
+        setCoverImageLoaded(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load trip");
       } finally {
@@ -362,6 +385,40 @@ export default function TripDetailPage() {
     }
   };
 
+  const handleUpdateCoverImage = async () => {
+    if (!user || !tripId || !tripPlan || !coverImageUrl) return;
+
+    setCoverImageUpdating(true);
+
+    try {
+      const token = await getIdToken();
+      const response = await fetch(`http://localhost:8000/api/trip/${tripId}/cover-image`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ cover_image: coverImageUrl }),
+      });
+
+      if (response.ok) {
+        const updatedTripPlan = { ...tripPlan, cover_image: coverImageUrl };
+        setTripPlan(updatedTripPlan);
+        setCoverImageLoaded(false);
+        setShowCoverImageModal(false);
+        // Show success toast
+        alert(language === "en" ? "Cover image updated successfully!" : "Ảnh bìa đã được cập nhật!");
+      } else {
+        throw new Error("Failed to update cover image");
+      }
+    } catch (err) {
+      console.error("Failed to update cover image:", err);
+      alert(language === "en" ? "Failed to update cover image. Please try again." : "Không thể cập nhật ảnh bìa. Vui lòng thử lại.");
+    } finally {
+      setCoverImageUpdating(false);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-green-50 flex items-center justify-center">
@@ -420,16 +477,47 @@ export default function TripDetailPage() {
         <div className="card bg-white shadow-xl mb-6">
           <div className="card-body">
             {/* Cover Image */}
-            {tripPlan.cover_image && (
-              <div className="relative h-64 w-full rounded-xl overflow-hidden mb-6 -mx-8 -mt-8">
-                <img
-                  src={tripPlan.cover_image}
-                  alt={tripPlan.trip_name}
-                  className="w-full h-full object-cover"
-                />
+            <div className="relative h-64 w-full rounded-xl overflow-hidden mb-6 -mx-8 -mt-8 group bg-gradient-to-r from-blue-400 via-teal-400 to-green-400">
+              {tripPlan?.cover_image && (
+                <>
+                  <img
+                    key={tripPlan.cover_image}
+                    src={tripPlan.cover_image}
+                    alt={tripPlan.trip_name}
+                    className="w-full h-full object-cover transition-opacity duration-500"
+                    onLoad={() => {
+                      console.log("✓ Cover image loaded successfully:", tripPlan.cover_image);
+                      setCoverImageLoaded(true);
+                    }}
+                    onError={(e) => {
+                      console.error("✗ Cover image failed to load:", tripPlan.cover_image, e);
+                      setCoverImageLoaded(false);
+                    }}
+                  />
+                  {coverImageLoaded && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                  )}
+                </>
+              )}
+              {!tripPlan?.cover_image && (
+                <div className="w-full h-full flex items-center justify-center">
+                  <svg className="w-16 h-16 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              )}
+              {!coverImageLoaded && tripPlan?.cover_image && (
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-              </div>
-            )}
+              )}
+              <button
+                onClick={() => setShowCoverImageModal(true)}
+                className="absolute top-4 right-4 btn btn-sm btn-circle bg-white/80 hover:bg-white border-none shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            </div>
             
             <div className="text-xs text-gray-400 mb-2">
               {language === "en" ? `Created: ${formatDate(tripData.created_at)}` : `Tạo lúc: ${formatDate(tripData.created_at)}`}
@@ -525,16 +613,16 @@ export default function TripDetailPage() {
                   </div>
                 </div>
 
-                {/* Total Cost - Updated gradient card style */}
+                {/* Total Cost - Vertical stacked layout */}
                 <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-4 mb-6 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <svg className="w-6 h-6 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-5 h-5 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-indigo-600 font-medium">{language === "en" ? "Total Cost" : "Tổng chi phí"}</div>
-                      <div className="text-sm font-bold text-gray-800 leading-tight break-words">{tripPlan.total_estimated_cost.replace(/đ/g, '₫').replace(/VND/g, '₫')}</div>
-                    </div>
+                    <span className="text-sm text-indigo-600 font-semibold">{language === "en" ? "Total Cost" : "Tổng chi phí"}</span>
+                  </div>
+                  <div className="font-bold text-indigo-700">
+                    {tripPlan?.total_estimated_cost?.replace(/VND/g, '₫').replace(/đ/g, '₫') || '0 ₫'}
                   </div>
                 </div>
 
@@ -697,6 +785,23 @@ export default function TripDetailPage() {
                       <h3 className="text-xl font-bold">{day.title}</h3>
                     </div>
 
+                    {/* Route Map for this day */}
+                    {day.activities.some(a => a.place_details?.lat && a.place_details?.lng) && (
+                      <div className="mb-4">
+                        <RouteMap
+                          locations={day.activities
+                            .filter(a => a.place_details?.lat && a.place_details?.lng)
+                            .map(a => ({
+                              lat: a.place_details!.lat,
+                              lng: a.place_details!.lng,
+                              name: a.place,
+                              time: a.time,
+                            }))}
+                          height="250px"
+                        />
+                      </div>
+                    )}
+
                     <DndContext
                       sensors={sensors}
                       collisionDetection={closestCenter}
@@ -723,6 +828,74 @@ export default function TripDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Cover Image Modal */}
+      {showCoverImageModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-pop-in">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {language === "en" ? "Update Cover Image" : "Cập nhật ảnh bìa"}
+            </h3>
+            
+            <div className="form-control mb-4">
+              <label className="label">
+                <span className="label-text font-semibold">{language === "en" ? "Image URL" : "URL hình ảnh"}</span>
+              </label>
+              <input
+                type="url"
+                placeholder="https://..."
+                className="input input-bordered w-full"
+                value={coverImageUrl}
+                onChange={(e) => setCoverImageUrl(e.target.value)}
+                disabled={coverImageUpdating}
+              />
+            </div>
+
+            {coverImageUrl && (
+              <div className="mb-4 rounded-lg overflow-hidden h-40 bg-gray-100">
+                <img
+                  src={coverImageUrl}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://via.placeholder.com/400x200?text=Invalid+URL";
+                  }}
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowCoverImageModal(false);
+                  setCoverImageUrl(tripPlan?.cover_image || "");
+                }}
+                className="btn btn-ghost"
+                disabled={coverImageUpdating}
+              >
+                {language === "en" ? "Cancel" : "Hủy"}
+              </button>
+              <button
+                onClick={handleUpdateCoverImage}
+                disabled={!coverImageUrl || coverImageUpdating}
+                className="btn btn-primary"
+              >
+                {coverImageUpdating ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm"></span>
+                    {language === "en" ? "Saving..." : "Đang lưu..."}
+                  </>
+                ) : (
+                  language === "en" ? "Save" : "Lưu"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

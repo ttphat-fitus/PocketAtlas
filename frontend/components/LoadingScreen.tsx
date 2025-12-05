@@ -69,18 +69,13 @@ export default function LoadingScreen({ progress }: LoadingScreenProps) {
         </div>
 
         {/* Progress bar */}
-        <div className="w-80 mx-auto mb-4">
+        <div className="w-80 mx-auto mb-6">
           <div className="bg-blue-900/50 rounded-full h-3 overflow-hidden">
             <div
               className="bg-gradient-to-r from-blue-400 to-teal-400 h-full transition-all duration-300 ease-out"
               style={{ width: `${progress}%` }}
             />
           </div>
-        </div>
-
-        {/* Progress percentage - rounded to whole number */}
-        <div className="text-white text-3xl font-bold mb-4">
-          {Math.round(progress)}%
         </div>
 
         {/* Loading text */}

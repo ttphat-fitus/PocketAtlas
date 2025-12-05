@@ -438,7 +438,7 @@ export default function MyTripsPage() {
                         <div className="flex items-center justify-between text-sm">
                           <div className="text-center">
                             <div className="text-xs text-gray-500 mb-1">{language === "en" ? "Start Date" : "Ngày bắt đầu"}</div>
-                            <div className="badge badge-primary badge-sm font-bold px-2 py-1.5 text-[10px]">
+                            <div className="inline-block px-2 py-1 text-[10px] font-bold text-blue-700 bg-blue-100 rounded-full whitespace-nowrap">
                               {formatDate(trip.start_date)}
                             </div>
                           </div>
@@ -459,7 +459,7 @@ export default function MyTripsPage() {
                           </div>
                           <div className="text-center">
                             <div className="text-xs text-gray-500 mb-1">{language === "en" ? "End Date" : "Ngày kết thúc"}</div>
-                            <div className="badge badge-success badge-sm font-bold px-2 py-1.5 text-[10px]">
+                            <div className="inline-block px-2 py-1 text-[10px] font-bold text-green-700 bg-green-100 rounded-full whitespace-nowrap">
                               {formatDate(endDate.toISOString())}
                             </div>
                           </div>

@@ -20,6 +20,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import RouteMap from "../../../components/RouteMap";
 
 // Format date as dd/mm/yyyy
 const formatDate = (dateString: string): string => {
@@ -39,6 +40,8 @@ interface PlaceDetails {
   lat: number;
   lng: number;
   types?: string[];
+  booking_link?: string;
+  is_hotel?: boolean;
 }
 
 interface Activity {
@@ -180,6 +183,7 @@ function SortableActivity({
   onDelete,
   t,
 }: SortableActivityProps) {
+  const [showTips, setShowTips] = useState(false);
   const {
     attributes,
     listeners,
@@ -228,18 +232,51 @@ function SortableActivity({
             </div>
 
             <div className="flex-1">
-              {isEditing ? (
-                <input
-                  type="text"
-                  className="input input-bordered input-sm w-48 mb-2"
-                  value={activity.time}
-                  onChange={(e) => onEdit("time", e.target.value)}
-                />
-              ) : (
-                <div className="badge badge-primary badge-outline mb-2 font-medium">
-                  {activity.time}
-                </div>
-              )}
+              {/* Time, Price, Tips Toggle - All in one row */}
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                {isEditing ? (
+                  <input
+                    type="text"
+                    className="input input-bordered input-sm w-48"
+                    value={activity.time}
+                    onChange={(e) => onEdit("time", e.target.value)}
+                  />
+                ) : (
+                  <div className="badge badge-primary badge-outline font-medium">
+                    {activity.time}
+                  </div>
+                )}
+
+                {/* Price Badge - with better wrapping for long prices */}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    className="input input-bordered input-sm w-40"
+                    value={activity.estimated_cost}
+                    onChange={(e) => onEdit("estimated_cost", e.target.value)}
+                  />
+                ) : (
+                  <div className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full whitespace-nowrap">
+                    {activity.estimated_cost?.replace(/VND/g, '₫').replace(/đ/g, '₫') || 'Miễn phí'}
+                  </div>
+                )}
+
+                {/* Tips Toggle Button */}
+                {activity.tips && !isEditing && (
+                  <button
+                    onClick={() => setShowTips(!showTips)}
+                    className={`btn btn-xs gap-1 ${showTips ? 'btn-info' : 'btn-ghost btn-outline'}`}
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    Tips
+                    <svg className={`w-3 h-3 transition-transform ${showTips ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
 
               {isEditing ? (
                 <input
@@ -249,9 +286,26 @@ function SortableActivity({
                   onChange={(e) => onEdit("place", e.target.value)}
                 />
               ) : (
-                <h3 className="text-xl font-bold mb-2 text-gray-800">
-                  {activity.place}
-                </h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-xl font-bold text-gray-800">
+                    {activity.place}
+                  </h3>
+                  {/* Booking.com link for hotels */}
+                  {activity.place_details?.is_hotel && activity.place_details?.booking_link && (
+                    <a
+                      href={activity.place_details.booking_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-xs btn-outline gap-1 text-blue-700 border-blue-300 hover:bg-blue-50"
+                      title="Đặt phòng trên Booking.com"
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                      </svg>
+                      Booking
+                    </a>
+                  )}
+                </div>
               )}
 
               {activity.place_details?.address && (
@@ -305,26 +359,9 @@ function SortableActivity({
                 <p className="text-gray-700 mb-3">{activity.description}</p>
               )}
 
-              <div className="flex flex-wrap gap-2 mb-3">
-                {isEditing ? (
-                  <input
-                    type="text"
-                    className="input input-bordered input-sm"
-                    value={activity.estimated_cost}
-                    onChange={(e) => onEdit("estimated_cost", e.target.value)}
-                  />
-                ) : (
-                  <div className="badge badge-success gap-1">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {activity.estimated_cost}
-                  </div>
-                )}
-              </div>
-
-              {activity.tips && (
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg">
+              {/* Collapsible Tips Section */}
+              {activity.tips && (showTips || isEditing) && (
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg mb-3 animate-fadeIn">
                   <div className="flex items-start gap-2">
                     <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -358,6 +395,8 @@ function SortableActivity({
             </div>
           </div>
 
+          {/* Temporarily hidden - Edit/Delete/Maps features */}
+          {false && (
           <div className="flex flex-col gap-2 ml-4">
             {isEditing ? (
               <button
@@ -388,6 +427,7 @@ function SortableActivity({
               </a>
             )}
           </div>
+          )}
         </div>
       </div>
     </div>
@@ -568,7 +608,7 @@ export default function TripPlanPage() {
                 <div className="min-w-0">
                   <div className="text-[10px] text-blue-600 font-semibold">{language === "en" ? "Total Cost" : "Tổng chi phí"}</div>
                   <div className="font-bold text-gray-800 text-sm truncate">
-                    {tripPlan.total_estimated_cost.replace(/đ/g, '₫').replace(/VND/g, '₫')}
+                    {tripPlan.total_estimated_cost?.replace(/VND/g, '₫').replace(/đ/g, '₫') || '0 ₫'}
                   </div>
                 </div>
               </div>
@@ -780,6 +820,35 @@ export default function TripPlanPage() {
 
           {/* Activities Content */}
           <div className="lg:col-span-4">
+            {/* Route Map */}
+            {currentDay && currentDay.activities.some(a => a.place_details?.lat && a.place_details?.lng) && (
+              <div className="mb-6">
+                <div className="card bg-white shadow-lg">
+                  <div className="card-body p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                      </svg>
+                      <h3 className="text-lg font-bold text-gray-800">
+                        {language === "en" ? "Route Map" : "Bản đồ lộ trình"}
+                      </h3>
+                    </div>
+                    <RouteMap
+                      locations={currentDay.activities
+                        .filter(a => a.place_details?.lat && a.place_details?.lng)
+                        .map(a => ({
+                          lat: a.place_details!.lat,
+                          lng: a.place_details!.lng,
+                          name: a.place,
+                          time: a.time,
+                        }))}
+                      height="350px"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {currentDay && (
               <div>
                 <div className="mb-6">
