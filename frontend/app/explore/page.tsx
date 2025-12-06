@@ -198,63 +198,68 @@ export default function ExplorePage() {
         </div>
       </div>
 
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12 relative">
-        <div className="container mx-auto px-4">
-          <h1 className="text-4xl font-bold mb-2">
+      {/* Header with Optimized Search Bar */}
+      <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white py-16 shadow-lg">
+        <div className="container mx-auto px-4 max-w-4xl">
+          <h1 className="text-5xl font-bold mb-3 text-center">
             {t("explore_trips") || "Khám Phá Chuyến Đi"}
           </h1>
-          <p className="text-lg opacity-90">
+          <p className="text-lg opacity-95 text-center mb-8">
             {t("explore_description") ||
-              "Tham khảo và lấy cảm hứng từ các chuyến đi của cộng đồng"}
+              "Tham khảo các chuyến đi từ cộng đồng"}
           </p>
 
-          {/* Search Bar */}
-          <form onSubmit={handleSearch} className="mt-6">
-            <div className="relative max-w-2xl">
+          {/* Prominent Search Bar */}
+          <form onSubmit={handleSearch} className="mb-6">
+            <div className="relative">
               <input
                 type="text"
-                placeholder={t("search_destination") || "Tìm điểm đến, hoạt động..."}
-                className="input input-lg input-bordered w-full pr-12 text-gray-900"
+                placeholder={t("search_destination") || "Tìm điểm đến hoặc hoạt động..."}
+                className="input input-lg w-full pr-32 text-gray-900 shadow-2xl border-0 focus:ring-4 focus:ring-white/30 rounded-2xl"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <button
-                type="submit"
-                className="btn btn-primary btn-circle absolute right-2 top-2"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
+                <button
+                  onClick={handleRandomTrip}
+                  type="button"
+                  className="btn btn-ghost btn-circle btn-sm text-gray-600 hover:bg-purple-100"
+                  title={t("random_trip") || "Ngẫu nhiên"}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </button>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-circle btn-sm shadow-lg"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
           </form>
 
-          {/* Random Trip Button */}
-          <div className="mt-4">
-            <button
-              onClick={handleRandomTrip}
-              className="btn btn-outline btn-sm"
-              title={t("random_trip") || "Random trip"}
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {t("random_trip") || "Random"}
-            </button>
+          {/* Stats */}
+          <div className="flex justify-center gap-8 text-sm opacity-90">
+            <div className="text-center">
+              <div className="font-bold text-2xl">{total}</div>
+              <div>{language === "en" ? "Trips" : "Chuyến đi"}</div>
+            </div>
           </div>
         </div>
-
       </div>
 
       <div className="container mx-auto px-4 py-8">

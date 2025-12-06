@@ -1,6 +1,8 @@
 .gitignore
 key/
 *.json
+.package exceptions
+!package.json
 .package-lock exceptions
 !package-lock.json
 !frontend/package-lock.json

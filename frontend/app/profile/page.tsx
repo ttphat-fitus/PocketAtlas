@@ -295,7 +295,13 @@ export default function ProfilePage() {
             {language === "en" ? "My Profile" : "Hồ Sơ Của Tôi"}
           </h1>
         </div>
-        <div className="navbar-end mr-4">
+        <div className="navbar-end mr-4 flex gap-2">
+          <button onClick={() => router.push("/trips")} className="btn btn-ghost btn-sm">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            {language === "en" ? "My Trips" : "Chuyến đi"}
+          </button>
           {!isEditing && (
             <button onClick={() => setIsEditing(true)} className="btn btn-primary btn-sm">
               {language === "en" ? "Edit Profile" : "Chỉnh sửa"}
@@ -429,29 +435,32 @@ export default function ProfilePage() {
                     )}
                     
                     {/* Stats */}
-                    {profile?.stats && (
+                    {userStats && (
                       <div className="flex gap-6 text-sm">
                         <div>
-                          <span className="font-bold text-primary">{profile.stats.total_trips}</span>
+                          <span className="font-bold text-blue-600">{userStats.trips_count}</span>
                           <span className="text-gray-600 ml-1">{language === "en" ? "trips" : "chuyến đi"}</span>
                         </div>
                         <div>
-                          <span className="font-bold text-secondary">{profile.stats.public_trips}</span>
+                          <span className="font-bold text-green-600">{userStats.public_trips}</span>
                           <span className="text-gray-600 ml-1">{language === "en" ? "public" : "công khai"}</span>
                         </div>
                         <div>
-                          <span className="font-bold text-accent">{profile.stats.total_likes}</span>
+                          <span className="font-bold text-pink-600">{userStats.total_likes}</span>
                           <span className="text-gray-600 ml-1">{language === "en" ? "likes" : "lượt thích"}</span>
                         </div>
                       </div>
                     )}
                     
                     {/* Badges */}
-                    {profile?.stats?.badges && profile.stats.badges.length > 0 && (
+                    {badges.filter(b => b.earned).length > 0 && (
                       <div className="flex flex-wrap gap-2">
-                        {profile.stats.badges.map((badge) => (
-                          <div key={badge} className="badge badge-lg badge-primary gap-1">
-                            🏆 {badge}
+                        {badges.filter(b => b.earned).slice(0, 3).map((badge) => (
+                          <div key={badge.id} className="badge badge-lg badge-primary gap-1">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            {language === "en" ? badge.name : badge.name_vi}
                           </div>
                         ))}
                       </div>
@@ -667,7 +676,9 @@ export default function ProfilePage() {
                         <div className="flex items-center gap-2">
                           <h4 className="font-bold text-lg">{language === "en" ? badge.name : badge.name_vi}</h4>
                           {badge.earned && (
-                            <span className="badge badge-success badge-sm">✓</span>
+                            <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
                           )}
                         </div>
                         <p className="text-sm text-gray-600 mb-2">
@@ -744,7 +755,10 @@ export default function ProfilePage() {
                         </div>
                         {isRedeemed ? (
                           <div className="badge badge-success gap-1">
-                            ✓ {language === "en" ? "Owned" : "Đã đổi"}
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            {language === "en" ? "Owned" : "Đã đổi"}
                           </div>
                         ) : (
                           <button

@@ -81,18 +81,14 @@ export default function LandingPage() {
         <div className="navbar-end mr-4">
           {loading ? (
             <div className="loading loading-spinner loading-sm"></div>
-          ) : user ? (
+          ) : user && !user.isAnonymous ? (
             <div className="flex items-center gap-4">
-              {!user.isAnonymous && (
-                <>
-                  <a href="/profile" className="btn btn-ghost btn-sm">
-                    {language === "en" ? "Profile" : "Hồ sơ"}
-                  </a>
-                  <a href="/trips" className="btn btn-ghost btn-sm">
-                    {language === "en" ? "My Trips" : "Chuyến đi"}
-                  </a>
-                </>
-              )}
+              <a href="/profile" className="btn btn-ghost btn-sm">
+                {language === "en" ? "Profile" : "Hồ sơ"}
+              </a>
+              <a href="/trips" className="btn btn-ghost btn-sm">
+                {language === "en" ? "My Trips" : "Chuyến đi"}
+              </a>
               <a href="/trip/input" className="btn btn-primary btn-sm">
                 {t("home.planTrip.button")}
               </a>
@@ -133,7 +129,7 @@ export default function LandingPage() {
           {t("home.description")}
         </h2>
 
-        <a href="/auth" className="mt-8">
+        <a href="/trip/input" className="mt-8">
           <button className="btn btn-primary btn-lg rounded-full px-8 text-lg">
             {t("home.getStarted")}
           </button>

@@ -573,9 +573,6 @@ export default function TripPlanPage() {
               VI
             </button>
           </div>
-          <button className="btn btn-ghost" onClick={() => window.print()}>
-            {t("plan.print")}
-          </button>
         </div>
       </div>
 

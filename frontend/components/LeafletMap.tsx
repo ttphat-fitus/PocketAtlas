@@ -81,19 +81,29 @@ export default function LeafletMap({ locations, showRoute = true, height = "400p
     const avgLat = validLocations.reduce((sum, loc) => sum + loc.lat, 0) / validLocations.length;
     const avgLng = validLocations.reduce((sum, loc) => sum + loc.lng, 0) / validLocations.length;
 
-    // Initialize map
+    // Initialize map with better controls
     const map = L.map(mapRef.current, {
       center: [avgLat, avgLng],
       zoom: 13,
       scrollWheelZoom: true,
+      zoomControl: true,
     });
 
     mapInstanceRef.current = map;
 
-    // Add tile layer (OpenStreetMap)
+    // Add tile layer (OpenStreetMap) with better styling
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
+      minZoom: 10,
+    }).addTo(map);
+
+    // Add scale control for better distance visualization
+    L.control.scale({
+      position: "bottomright",
+      metric: true,
+      imperial: false,
+      maxWidth: 150,
     }).addTo(map);
 
     // Add markers
@@ -115,23 +125,40 @@ export default function LeafletMap({ locations, showRoute = true, height = "400p
       markers.push(marker);
     });
 
-    // Draw route line
+    // Draw route line with better visibility
     if (showRoute && validLocations.length > 1) {
       const points: L.LatLngExpression[] = validLocations.map(loc => [loc.lat, loc.lng]);
       
-      // Dashed line
+      // Shadow line for depth and better visibility
+      L.polyline(points, {
+        color: "#000000",
+        weight: 6,
+        opacity: 0.15,
+      }).addTo(map);
+      
+      // Main route line - solid and clearer
       L.polyline(points, {
         color: "#3b82f6",
-        weight: 3,
-        opacity: 0.7,
-        dashArray: "10, 10",
+        weight: 4,
+        opacity: 0.85,
+        lineJoin: "round",
+        lineCap: "round",
       }).addTo(map);
     }
 
-    // Fit bounds
+    // Fit bounds with better padding for optimal view
     if (validLocations.length > 1) {
       const bounds = L.latLngBounds(validLocations.map(loc => [loc.lat, loc.lng]));
-      map.fitBounds(bounds, { padding: [50, 50] });
+      
+      // Dynamic padding based on number of locations
+      const paddingSize = validLocations.length <= 3 ? 80 : validLocations.length <= 6 ? 60 : 50;
+      map.fitBounds(bounds, { 
+        padding: [paddingSize, paddingSize],
+        maxZoom: 15 // Prevent too much zoom for close locations
+      });
+    } else if (validLocations.length === 1) {
+      // Single location - center and set reasonable zoom
+      map.setView([validLocations[0].lat, validLocations[0].lng], 14);
     }
 
     // Cleanup

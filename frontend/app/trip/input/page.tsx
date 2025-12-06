@@ -26,12 +26,20 @@ export default function TripInputPage() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState("");
 
-  // Redirect to auth if not authenticated
+  // Auto sign-in anonymously if not authenticated
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth");
-    }
-  }, [user, authLoading, router]);
+    const handleAuth = async () => {
+      if (!authLoading && !user) {
+        try {
+          await signInAnon();
+        } catch (error) {
+          console.error("Failed to sign in anonymously:", error);
+          router.push("/auth");
+        }
+      }
+    };
+    handleAuth();
+  }, [user, authLoading, router, signInAnon]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -340,53 +340,61 @@ export default function CreateBlogPage() {
             </div>
           </div>
 
-          {/* Step 2: Title & Summary */}
+          {/* Step 2: Title & Summary with Language Toggle */}
           <div className="card bg-white shadow-md hover:shadow-lg transition-shadow">
             <div className="card-body p-4">
-              <h3 className="font-bold text-base mb-3 flex items-center gap-2">
-                <span className="badge badge-primary">2</span>
-                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                {language === "en" ? "Title & Summary" : "Tiêu đề & Tóm tắt"}
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                <div className="form-control">
-                  <input
-                    type="text"
-                    placeholder={language === "en" ? "Title (EN)" : "Tiêu đề (EN)"}
-                    className="input input-bordered input-sm"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-control">
-                  <input
-                    type="text"
-                    placeholder={language === "en" ? "Title (VI)" : "Tiêu đề (VI)"}
-                    className="input input-bordered input-sm"
-                    value={formData.title_vi}
-                    onChange={(e) => setFormData({ ...formData, title_vi: e.target.value })}
-                  />
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <span className="badge badge-primary">2</span>
+                  <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  {language === "en" ? "Title & Summary" : "Tiêu đề & Tóm tắt"}
+                </h3>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setUseAI(false)} className={`btn btn-xs ${useAI === false ? 'btn-primary' : 'btn-ghost'}`}>EN</button>
+                  <button type="button" onClick={() => setUseAI(true)} className={`btn btn-xs ${useAI === true ? 'btn-primary' : 'btn-ghost'}`}>VI</button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <textarea
-                  placeholder={language === "en" ? "Summary (EN)" : "Tóm tắt (EN)"}
-                  className="textarea textarea-bordered textarea-sm h-20"
-                  value={formData.excerpt}
-                  onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
-                />
-                <textarea
-                  placeholder={language === "en" ? "Summary (VI)" : "Tóm tắt (VI)"}
-                  className="textarea textarea-bordered textarea-sm h-20"
-                  value={formData.excerpt_vi}
-                  onChange={(e) => setFormData({ ...formData, excerpt_vi: e.target.value })}
-                />
-              </div>
+              {useAI === false ? (
+                <div className="space-y-3">
+                  <div className="form-control">
+                    <input
+                      type="text"
+                      placeholder="Title (English)"
+                      className="input input-bordered input-sm"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <textarea
+                    placeholder="Summary (English)"
+                    className="textarea textarea-bordered textarea-sm h-20"
+                    value={formData.excerpt}
+                    onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="form-control">
+                    <input
+                      type="text"
+                      placeholder="Tiêu đề (Tiếng Việt)"
+                      className="input input-bordered input-sm"
+                      value={formData.title_vi}
+                      onChange={(e) => setFormData({ ...formData, title_vi: e.target.value })}
+                    />
+                  </div>
+                  <textarea
+                    placeholder="Tóm tắt (Tiếng Việt)"
+                    className="textarea textarea-bordered textarea-sm h-20"
+                    value={formData.excerpt_vi}
+                    onChange={(e) => setFormData({ ...formData, excerpt_vi: e.target.value })}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -444,33 +452,39 @@ export default function CreateBlogPage() {
             </div>
           </div>
 
-          {/* Step 4: Content */}
+          {/* Step 4: Content with Language Toggle */}
           <div className="card bg-white shadow-md hover:shadow-lg transition-shadow">
             <div className="card-body p-4">
-              <h3 className="font-bold text-base mb-3 flex items-center gap-2">
-                <span className="badge badge-primary">4</span>
-                <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                {language === "en" ? "Content (Markdown)" : "Nội dung (Markdown)"}
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <span className="badge badge-primary">4</span>
+                  <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {language === "en" ? "Content (Markdown)" : "Nội dung (Markdown)"}
+                </h3>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setPreviewMode(false)} className={`btn btn-xs ${previewMode === false ? 'btn-primary' : 'btn-ghost'}`}>EN</button>
+                  <button type="button" onClick={() => setPreviewMode(true)} className={`btn btn-xs ${previewMode === true ? 'btn-primary' : 'btn-ghost'}`}>VI</button>
+                </div>
+              </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {previewMode === false ? (
                 <textarea
-                  placeholder={language === "en" ? "Write content (EN)..." : "Viết nội dung (EN)..."}
+                  placeholder="Write content in English using Markdown format..."
                   className="textarea textarea-bordered textarea-sm h-60 font-mono text-xs"
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                   required
                 />
-
+              ) : (
                 <textarea
-                  placeholder={language === "en" ? "Write content (VI)..." : "Viết nội dung (VI)..."}
+                  placeholder="Viết nội dung bằng tiếng Việt sử dụng định dạng Markdown..."
                   className="textarea textarea-bordered textarea-sm h-60 font-mono text-xs"
                   value={formData.content_vi}
                   onChange={(e) => setFormData({ ...formData, content_vi: e.target.value })}
                 />
-              </div>
+              )}
             </div>
           </div>
 
