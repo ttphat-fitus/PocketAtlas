@@ -47,6 +47,22 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Async HTTP client dùng chung cho toàn bộ app
+shared_http_client: Optional[httpx.AsyncClient] = None
+
+@app.on_event("startup")
+async def startup_event():
+    global shared_http_client
+    # Có thể chỉnh timeout chung nếu cần
+    shared_http_client = httpx.AsyncClient(timeout=10.0)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    global shared_http_client
+    if shared_http_client is not None:
+        await shared_http_client.aclose()
+        shared_http_client = None
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -72,17 +88,34 @@ class TripRequest(BaseModel):
 # ============== Helper Functions ==============
 
 # Async HTTP Client for concurrent requests
-async def async_get(url: str, params: dict = None, timeout: int = 10) -> dict:
-    """Make async GET request with httpx"""
+async def async_get(
+    url: str,
+    params: dict = None,
+    timeout: int = 10,
+    headers: dict = None
+) -> dict:
+    """Make async GET request with shared httpx.AsyncClient (reuses connections)"""
+    from typing import Optional
+    global shared_http_client
+
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(url, params=params)
-            if response.status_code == 200:
-                return response.json()
-            return {}
-    except Exception as e:
-        print(f"Async GET error: {e}")
+        client: Optional[httpx.AsyncClient] = shared_http_client
+
+        # Fallback khi chạy unit test hoặc chưa init app
+        if client is None:
+            async with httpx.AsyncClient(timeout=timeout) as temp_client:
+                resp = await temp_client.get(url, params=params, headers=headers)
+        else:
+            resp = await client.get(url, params=params, headers=headers, timeout=timeout)
+
+        if resp.status_code == 200:
+            return resp.json()
+        print(f"Async GET non-200: {resp.status_code} {url}")
         return {}
+    except Exception as e:
+        print(f"Async GET error: {e} ({url})")
+        return {}
+
 
 
 async def async_geocode(address: str) -> dict:
@@ -156,17 +189,18 @@ def get_unsplash_image(destination: str) -> str:
 
 
 async def get_unsplash_image_async(destination: str) -> str:
-    """Async version: Get a high-quality image from Unsplash for a destination"""
+    """Async version: Get a high-quality image from Unsplash for a destination (reusing HTTP client)"""
     try:
-        # Improve query specificity - add Vietnam for Vietnamese cities
         query = destination
-        vietnamese_cities = ["Hà Nội", "Hanoi", "Sài Gòn", "Saigon", "Hồ Chí Minh", "Ho Chi Minh", 
-                             "Đà Nẵng", "Da Nang", "Huế", "Hue", "Nha Trang", "Vũng Tàu", "Vung Tau"]
+        vietnamese_cities = [
+            "Hà Nội", "Hanoi", "Sài Gòn", "Saigon", "Hồ Chí Minh", "Ho Chi Minh",
+            "Đà Nẵng", "Da Nang", "Huế", "Hue", "Nha Trang", "Vũng Tàu", "Vung Tau"
+        ]
         if any(city.lower() in destination.lower() for city in vietnamese_cities):
             query = f"{destination} Vietnam cityscape"
         else:
             query = f"{destination} travel landmark cityscape"
-        
+
         url = "https://api.unsplash.com/search/photos"
         params = {
             "client_id": UNSPLASH_ACCESS_KEY,
@@ -175,29 +209,27 @@ async def get_unsplash_image_async(destination: str) -> str:
             "orientation": "landscape",
             "content_filter": "high"
         }
-        
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(url, params=params)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("results") and len(data["results"]) > 0:
-                    image_url = data["results"][0]["urls"]["regular"]
-                    print(f"✓ Unsplash (async): Found image for '{destination}'")
-                    return image_url
-                else:
-                    print(f"⚠ Unsplash (async): No results for '{destination}'")
-            else:
-                print(f"✗ Unsplash API Error {response.status_code}")
-            
+
+        data = await async_get(url, params=params, timeout=10)
+        if data.get("results"):
+            first = data["results"][0]
+            image_url = first.get("urls", {}).get("regular")
+            if image_url:
+                print(f"✓ Unsplash (async): Found image for '{destination}'")
+                return image_url
+            print(f"⚠ Unsplash (async): No url in first result for '{destination}'")
+        else:
+            print(f"⚠ Unsplash (async): No results for '{destination}'")
+
     except Exception as e:
         print(f"✗ Unsplash Exception (async): {e}")
-    
-    # Fallback to Lorem Picsum
+
+    # Fallback
     seed = destination.replace(' ', '').replace(',', '').lower()
     fallback_url = f"https://picsum.photos/seed/{seed}/1200/800"
     print(f"→ Using fallback image for '{destination}'")
     return fallback_url
+
 
 
 def get_weather_forecast(lat: float, lng: float, days: int = 10) -> dict:
@@ -258,9 +290,8 @@ def get_weather_forecast(lat: float, lng: float, days: int = 10) -> dict:
 
 
 async def get_weather_forecast_async(lat: float, lng: float, days: int = 10) -> dict:
-    """Async version: Get weather forecast using WeatherAPI for detailed conditions"""
+    """Async: Get weather forecast using WeatherAPI (reusing shared HTTP client)"""
     try:
-        # WeatherAPI endpoint - supports up to 14 days on paid plans, 3 on free
         url = "http://api.weatherapi.com/v1/forecast.json"
         params = {
             "key": WEATHER_API_KEY,
@@ -269,25 +300,22 @@ async def get_weather_forecast_async(lat: float, lng: float, days: int = 10) -> 
             "aqi": "no",
             "alerts": "no"
         }
-        
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(url, params=params)
-            data = resp.json()
-        
+
+        data = await async_get(url, params=params, timeout=10)
+        if not data:
+            return {"forecasts": []}
+
         forecast_days = data.get("forecast", {}).get("forecastday", [])
-        
+
         forecasts = []
         for day_data in forecast_days:
             day_info = day_data.get("day", {})
             date_str = day_data.get("date", "")
-            
-            # Get condition text for LLM context
+
             condition = day_info.get("condition", {}).get("text", "Clear")
-            
-            # Determine if weather is suitable for outdoor/indoor activities
             is_rainy = "rain" in condition.lower() or "drizzle" in condition.lower()
             is_sunny = "sunny" in condition.lower() or "clear" in condition.lower()
-            
+
             forecasts.append({
                 "date": date_str,
                 "day_name": datetime.strptime(date_str, "%Y-%m-%d").strftime("%A"),
@@ -299,15 +327,19 @@ async def get_weather_forecast_async(lat: float, lng: float, days: int = 10) -> 
                 "rain_chance": day_info.get("daily_chance_of_rain", 0),
                 "is_rainy": is_rainy,
                 "is_sunny": is_sunny,
-                "suggestion": "Indoor activities recommended" if is_rainy else "Great for outdoor activities" if is_sunny else "Mixed activities suitable"
+                "suggestion": (
+                    "Indoor activities recommended" if is_rainy else
+                    "Great for outdoor activities" if is_sunny else
+                    "Mixed activities suitable"
+                )
             })
-        
+
         print(f"      → Weather forecast (async): {len(forecasts)} days with detailed conditions")
-        
         return {"forecasts": forecasts}
     except Exception as e:
         print(f"Weather API error (async): {e}")
         return {"forecasts": []}
+
 
 
 def get_place_details(place_name: str, location: str) -> dict:
@@ -478,7 +510,7 @@ def get_place_details(place_name: str, location: str) -> dict:
 
 
 async def get_place_details_async(place_name: str, location: str, location_coords: dict = None) -> dict:
-    """Async version: Enhanced place details using Google Maps API"""
+    """Async: Enhanced place details using Google Maps API (reusing shared HTTP client)"""
     def sanitize(s: str) -> str:
         if not s:
             return ""
@@ -490,113 +522,135 @@ async def get_place_details_async(place_name: str, location: str, location_coord
         return s
 
     empty_result = {
-        "name": place_name, "address": "", "rating": 0, "total_ratings": 0,
-        "photo_url": "", "lat": 0, "lng": 0, "types": [], "price_level": 0,
-        "weather": {"forecasts": []}, "phone": "", "website": "", "opening_hours": [],
-        "reviews": [], "google_maps_link": "", "booking_link": "", "is_hotel": False
+        "name": place_name,
+        "address": "",
+        "rating": 0,
+        "total_ratings": 0,
+        "photo_url": "",
+        "lat": 0,
+        "lng": 0,
+        "types": [],
+        "price_level": 0,
+        "weather": {"forecasts": []},
+        "phone": "",
+        "website": "",
+        "opening_hours": [],
+        "reviews": [],
+        "google_maps_link": "",
+        "booking_link": "",
+        "is_hotel": False,
     }
 
     try:
         q = sanitize(place_name)
         if not q or len(q) < 3:
             return empty_result
-        
-        async with httpx.AsyncClient(timeout=15) as client:
-            # Use pre-fetched location coords if available (optimization)
-            location_bias = ""
-            if location_coords and location_coords.get("lat"):
-                location_bias = f"point:{location_coords['lat']},{location_coords['lng']}"
-            else:
-                # Fallback to geocoding
-                geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
-                geocode_params = {"address": location, "key": GOOGLE_MAPS_API_KEY}
-                try:
-                    geocode_resp = await client.get(geocode_url, params=geocode_params)
-                    geocode_data = geocode_resp.json()
-                    if geocode_data.get("results"):
-                        geo_loc = geocode_data["results"][0]["geometry"]["location"]
-                        location_bias = f"point:{geo_loc['lat']},{geo_loc['lng']}"
-                except:
-                    pass
-            
-            # Step 1: Google Places Text Search with location bias
-            search_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-            search_params = {
-                "query": f"{q} {location}",
-                "key": GOOGLE_MAPS_API_KEY,
-                "language": "vi"
-            }
-            if location_bias:
-                search_params["locationbias"] = location_bias
-            
-            resp = await client.get(search_url, params=search_params)
-            data = resp.json()
-            
-            if data.get("status") != "OK" or not data.get("results"):
-                return empty_result
-            
-            place = data["results"][0]
-            place_id = place.get("place_id")
-            geometry = place.get("geometry", {})
-            location_data = geometry.get("location", {})
-            lat = float(location_data.get("lat", 0))
-            lng = float(location_data.get("lng", 0))
-            
-            # Step 2: Get Place Details (richer info)
-            details_url = "https://maps.googleapis.com/maps/api/place/details/json"
-            details_params = {
-                "place_id": place_id,
-                "fields": "name,formatted_address,rating,user_ratings_total,photos,geometry,types,price_level,formatted_phone_number,website,opening_hours,reviews",
-                "key": GOOGLE_MAPS_API_KEY,
-                "language": "vi"
-            }
-            
-            details_resp = await client.get(details_url, params=details_params)
-            details_data = details_resp.json()
-            
-            place_details = details_data.get("result", place) if details_data.get("status") == "OK" else place
-        
-        # Extract photo URL
+
+        headers = {"User-Agent": "PocketAtlas/1.0"}
+
+        # Location bias: ưu tiên dùng location_coords truyền vào
+        location_bias = ""
+        if location_coords and location_coords.get("lat"):
+            location_bias = f"point:{location_coords['lat']},{location_coords['lng']}"
+        else:
+            geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
+            geocode_params = {"address": location, "key": GOOGLE_MAPS_API_KEY}
+            geocode_data = await async_get(geocode_url, params=geocode_params, timeout=5, headers=headers)
+            if geocode_data.get("results"):
+                geo_loc = geocode_data["results"][0]["geometry"]["location"]
+                location_bias = f"point:{geo_loc['lat']},{geo_loc['lng']}"
+
+        # Step 1: Text Search
+        search_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+        search_params = {
+            "query": f"{q} {location}",
+            "key": GOOGLE_MAPS_API_KEY,
+            "language": "vi",
+        }
+        if location_bias:
+            search_params["locationbias"] = location_bias
+
+        search_data = await async_get(search_url, params=search_params, timeout=10, headers=headers)
+        if search_data.get("status") != "OK" or not search_data.get("results"):
+            return empty_result
+
+        place = search_data["results"][0]
+        place_id = place.get("place_id")
+        geometry = place.get("geometry", {})
+        location_data = geometry.get("location", {})
+        lat = float(location_data.get("lat", 0))
+        lng = float(location_data.get("lng", 0))
+
+        # Step 2: Place Details
+        details_url = "https://maps.googleapis.com/maps/api/place/details/json"
+        details_params = {
+            "place_id": place_id,
+            "fields": (
+                "name,formatted_address,rating,user_ratings_total,photos,geometry,"
+                "types,price_level,formatted_phone_number,website,opening_hours,reviews"
+            ),
+            "key": GOOGLE_MAPS_API_KEY,
+            "language": "vi",
+        }
+
+        details_data = await async_get(details_url, params=details_params, timeout=10, headers=headers)
+        if details_data.get("status") == "OK":
+            place_details = details_data.get("result", place)
+        else:
+            place_details = place
+
+        # Photo
         photo_url = ""
         photos = place_details.get("photos", [])
-        if photos and len(photos) > 0:
+        if photos:
             photo_reference = photos[0].get("photo_reference")
-            photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference={photo_reference}&key={GOOGLE_MAPS_API_KEY}"
-        
-        # Note: Skip weather in async version to avoid nested async calls
+            if photo_reference:
+                photo_url = (
+                    "https://maps.googleapis.com/maps/api/place/photo"
+                    f"?maxwidth=800&photo_reference={photo_reference}&key={GOOGLE_MAPS_API_KEY}"
+                )
+
+        # Weather: giữ trống trong async version để tránh nested API
         weather_data = {"forecasts": []}
-        
-        # Extract reviews (top 3)
+
+        # Reviews (max 3)
         reviews_raw = place_details.get("reviews", [])
         reviews = []
         for review in reviews_raw[:3]:
+            text = review.get("text", "") or ""
             reviews.append({
                 "author": review.get("author_name", "Anonymous"),
                 "rating": review.get("rating", 0),
-                "text": review.get("text", "")[:200] + "..." if len(review.get("text", "")) > 200 else review.get("text", ""),
-                "time": review.get("relative_time_description", "")
+                "text": text[:200] + "..." if len(text) > 200 else text,
+                "time": review.get("relative_time_description", ""),
             })
-        
-        # Extract opening hours
+
+        # Opening hours
         opening_hours = []
         opening_hours_data = place_details.get("opening_hours", {})
         if opening_hours_data.get("weekday_text"):
-            opening_hours = opening_hours_data.get("weekday_text", [])
-        
-        # Generate Google Maps link
+            opening_hours = opening_hours_data["weekday_text"]
+
+        # Maps link
         google_maps_link = ""
-        if lat != 0 and lng != 0:
-            google_maps_link = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}&query_place_id={place_id}"
-        
-        # Check if this is a hotel/lodging and generate Booking.com link
+        if lat != 0 and lng != 0 and place_id:
+            google_maps_link = (
+                "https://www.google.com/maps/search/?api=1"
+                f"&query={lat},{lng}&query_place_id={place_id}"
+            )
+
+        # Booking link nếu là hotel
         place_types = place_details.get("types", [])
         booking_link = ""
         is_hotel = any(t in place_types for t in ["lodging", "hotel", "resort", "guest_house", "motel"])
         if is_hotel:
             place_display_name = place_details.get("name", place_name)
             from urllib.parse import quote
-            booking_link = f"https://www.booking.com/searchresults.html?ss={quote(place_display_name + ' ' + location)}"
-        
+            booking_link = (
+                "https://www.booking.com/searchresults.html?ss="
+                f"{quote(place_display_name + ' ' + location)}"
+            )
+
         return {
             "name": place_details.get("name", place_name),
             "address": place_details.get("formatted_address", ""),
@@ -614,74 +668,154 @@ async def get_place_details_async(place_name: str, location: str, location_coord
             "reviews": reviews,
             "google_maps_link": google_maps_link,
             "booking_link": booking_link,
-            "is_hotel": is_hotel
+            "is_hotel": is_hotel,
         }
-    
+
     except Exception as e:
         print(f"Error fetching Google Maps API (async) for '{place_name}': {e}")
         return empty_result
 
 
-async def enrich_activities_parallel(trip_plan: dict, destination: str, batch_size: int = 5) -> dict:
+
+async def fetch_destination_weather(trip_request: TripRequest) -> List[dict]:
     """
-    Enrich all activities with place details in PARALLEL batches using asyncio.gather().
-    This significantly speeds up the API by fetching multiple place details concurrently.
+    Async function to fetch weather forecast for trip destination.
+    Can be run in parallel with other operations like enrichment and image fetching.
     
     Args:
-        trip_plan: The trip plan dict from AI
-        destination: The destination for location bias
-        batch_size: Number of concurrent requests per batch (default 5 to avoid rate limiting)
+        trip_request: TripRequest object with destination and trip details
     
     Returns:
-        Enriched trip_plan with place_details for each activity
+        List of weather forecast dictionaries for each day of the trip
     """
-    # First, get destination coordinates once (to avoid repeated geocoding)
-    location_coords = await async_geocode(destination)
+    destination_weather = []
+    try:
+        start_date = datetime.strptime(trip_request.start_date, "%Y-%m-%d")
+        today = datetime.now()
+        days_until_trip = (start_date - today).days
+        
+        # Only fetch weather if trip starts within 14 days (WeatherAPI free tier supports up to 14 days)
+        if 0 <= days_until_trip <= 14:
+            # Use async geocoding and weather fetching
+            location_coords = await async_geocode(trip_request.destination)
+            
+            if location_coords.get("lat"):
+                weather_data = await get_weather_forecast_async(
+                    location_coords["lat"], 
+                    location_coords["lng"], 
+                    trip_request.duration
+                )
+                forecasts = weather_data.get("forecasts", [])
+                print(f"✓ Weather API (async) returned {len(forecasts)} days of forecast")
+                
+                # Match weather to trip dates
+                for i in range(min(trip_request.duration, len(forecasts))):
+                    trip_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+                    if i < len(forecasts):
+                        fc = forecasts[i]
+                        destination_weather.append({
+                            "day": i + 1,
+                            "date": trip_date,
+                            "condition": fc.get("condition", "Clear"),
+                            "temp_max": fc.get("temp_max", 0),
+                            "temp_min": fc.get("temp_min", 0),
+                            "rain_chance": fc.get("rain_chance", 0),
+                            "humidity": fc.get("humidity", 0),
+                            "suggestion": fc.get("suggestion", "")
+                        })
+                
+                print(f"✓ Weather forecast added for {len(destination_weather)} days")
+        else:
+            print(f"⚠ Trip starts in {days_until_trip} days - beyond weather forecast range (14 days), skipping weather fetch")
     
-    # Collect all activities
-    all_activities = []
+    except Exception as e:
+        print(f"Could not fetch destination weather: {e}")
+    
+    return destination_weather
+
+
+async def enrich_activities_parallel(
+    trip_plan: dict,
+    destination: str,
+    batch_size: int = 8
+) -> dict:
+    """
+    Enrich all activities with place details in parallel batches.
+    De-duplicate by place_name: mỗi place chỉ gọi Google Places 1 lần.
+    """
+    from typing import Dict, List
+
+    # Geocode destination một lần để dùng bias chung
+    location_coords = await async_geocode(destination)
+
+    place_to_activities: Dict[str, List[dict]] = {}
+
     for day in trip_plan.get("days", []):
         for activity in day.get("activities", []):
             place_name = activity.get("place", "")
-            if place_name:
-                all_activities.append(activity)
-    
-    total_activities = len(all_activities)
-    print(f"📍 Enriching {total_activities} activities in parallel batches of {batch_size}...")
-    
-    # Process in batches to avoid overwhelming the API
-    for batch_start in range(0, total_activities, batch_size):
-        batch_end = min(batch_start + batch_size, total_activities)
-        batch = all_activities[batch_start:batch_end]
-        
-        print(f"  → Batch {batch_start // batch_size + 1}: Processing activities {batch_start + 1}-{batch_end}")
-        
-        # Create tasks for parallel execution
+            if not place_name:
+                continue
+            place_to_activities.setdefault(place_name, []).append(activity)
+
+    unique_places = list(place_to_activities.keys())
+    total_places = len(unique_places)
+    total_activities = sum(len(v) for v in place_to_activities.values())
+
+    print(
+        f"📍 Enriching {total_activities} activities across "
+        f"{total_places} unique places in parallel batches of {batch_size}..."
+    )
+
+    for batch_start in range(0, total_places, batch_size):
+        batch_end = min(batch_start + batch_size, total_places)
+        batch_places = unique_places[batch_start:batch_end]
+
+        print(
+            f"  → Batch {batch_start // batch_size + 1}: "
+            f"Places {batch_start + 1}-{batch_end}"
+        )
+
         tasks = [
-            get_place_details_async(activity.get("place", ""), destination, location_coords)
-            for activity in batch
+            get_place_details_async(place_name, destination, location_coords)
+            for place_name in batch_places
         ]
-        
-        # Execute all tasks in parallel using asyncio.gather()
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Assign results to activities
-        for i, result in enumerate(results):
+
+        for place_name, result in zip(batch_places, results):
+            activities = place_to_activities.get(place_name, [])
             if isinstance(result, Exception):
-                print(f"    ⚠ Error for {batch[i].get('place', 'unknown')}: {result}")
-                batch[i]["place_details"] = {
-                    "name": batch[i].get("place", ""), "address": "", "rating": 0,
-                    "total_ratings": 0, "photo_url": "", "lat": 0, "lng": 0, "types": [],
-                    "price_level": 0, "weather": {"forecasts": []}, "phone": "",
-                    "website": "", "opening_hours": [], "reviews": [], "google_maps_link": ""
+                print(f"    ⚠ Error for {place_name[:30]}: {result}")
+                fallback_details = {
+                    "name": place_name,
+                    "address": "",
+                    "rating": 0,
+                    "total_ratings": 0,
+                    "photo_url": "",
+                    "lat": 0,
+                    "lng": 0,
+                    "types": [],
+                    "price_level": 0,
+                    "weather": {"forecasts": []},
+                    "phone": "",
+                    "website": "",
+                    "opening_hours": [],
+                    "reviews": [],
+                    "google_maps_link": "",
+                    "booking_link": "",
+                    "is_hotel": False,
                 }
+                for act in activities:
+                    act["place_details"] = fallback_details
             else:
-                batch[i]["place_details"] = result
+                for act in activities:
+                    act["place_details"] = result
                 if result.get("address"):
-                    print(f"    ✓ {batch[i].get('place', 'unknown')[:30]}...")
-    
+                    print(f"    ✓ {place_name[:30]}...")
+
     print(f"✅ Enriched {total_activities} activities successfully!")
     return trip_plan
+
+
 
 
 def calculate_user_badges(uid: str) -> dict:
@@ -932,9 +1066,8 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
     Main endpoint: Generate personalized travel itinerary and save to Firestore.
     
     OPTIMIZATION: Uses asyncio.gather() for parallel API calls:
-    - Parallel place details enrichment (5 activities at a time)
-    - Async weather and cover image fetching
-    - ~5-10x faster than sequential processing
+    - Parallel place details enrichment (N activities at a time)
+    - Async weather and (optionally) cover image fetching
     """
     try:
         import time
@@ -958,88 +1091,70 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
             print("JSON not found in response")
             return JSONResponse(
                 status_code=500,
-                content={"error": "AI không trả về định dạng JSON hợp lệ", "raw": raw_text[:500]}
+                content={
+                    "error": "AI không trả về định dạng JSON hợp lệ",
+                    "raw": raw_text[:500]
+                }
             )
         
         json_str = match.group(1) or match.group(2)
         trip_plan = json.loads(json_str)
-        
-        # Get destination weather forecast for trip dates (only if within 14 days)
-        destination_weather = []
-        forecasts = []
-        try:
-            from datetime import datetime, timedelta
-            start_date = datetime.strptime(trip_request.start_date, "%Y-%m-%d")
-            today = datetime.now()
-            days_until_trip = (start_date - today).days
-            
-            # Only fetch weather if trip starts within 14 days (WeatherAPI free tier supports up to 14 days)
-            if 0 <= days_until_trip <= 14:
-                # Use async geocoding and weather fetching
-                location_coords = await async_geocode(trip_request.destination)
-                
-                if location_coords.get("lat"):
-                    weather_data = await get_weather_forecast_async(
-                        location_coords["lat"], 
-                        location_coords["lng"], 
-                        trip_request.duration
-                    )
-                    forecasts = weather_data.get("forecasts", [])
-                    print(f"✓ Weather API (async) returned {len(forecasts)} days of forecast")
-            else:
-                print(f"⚠ Trip starts in {days_until_trip} days - beyond weather forecast range (14 days), skipping weather fetch")
-            
-            # Match weather to trip dates (only if we have forecasts)
-            if forecasts:
-                for i in range(min(trip_request.duration, len(forecasts))):
-                    trip_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
-                    if i < len(forecasts):
-                        fc = forecasts[i]
-                        destination_weather.append({
-                            "day": i + 1,
-                            "date": trip_date,
-                            "condition": fc.get("condition", "Clear"),
-                            "temp_max": fc.get("temp_max", 0),
-                            "temp_min": fc.get("temp_min", 0),
-                            "rain_chance": fc.get("rain_chance", 0),
-                            "humidity": fc.get("humidity", 0),
-                            "suggestion": fc.get("suggestion", "")
-                        })
-                
-                print(f"✓ Weather forecast added for {len(destination_weather)} days")
-        except Exception as e:
-            print(f"Could not fetch destination weather: {e}")
-        
-        # Add weather to trip plan for user display
-        trip_plan["weather_forecast"] = destination_weather
-        
-        # ========== PARALLEL ENRICHMENT with asyncio.gather() ==========
-        # This replaces the sequential loop with parallel processing for 5-10x faster response
-        print("🚀 Enriching activities with Google Places API (PARALLEL mode)...")
-        
-        trip_plan = await enrich_activities_parallel(
-            trip_plan, 
-            trip_request.destination, 
-            batch_size=5  # Process 5 activities concurrently
+
+        # ========== RUN WEATHER + ENRICHMENT (+ COVER) IN PARALLEL ==========
+        print("🚀 Running weather fetch, activity enrichment, and cover image fetch in parallel...")
+
+        # 1) Task weather
+        weather_task = fetch_destination_weather(trip_request)
+
+        # 2) Task enrich
+        enrichment_task = enrich_activities_parallel(
+            trip_plan,
+            trip_request.destination,
+            batch_size=8  # có thể tăng lên 8–10 sau khi test
         )
-        
-        total_activities = sum(len(day.get("activities", [])) for day in trip_plan.get("days", []))
-        print(f"Trip plan generated successfully with {total_activities} activities!")
-        
-        # ========== PARALLEL: Fetch cover image while saving ==========
-        # Save trip to Firestore if user is authenticated
+
+        # 3) Task cover image: chỉ fetch nếu có user (nếu không dùng cover cho anonymous)
+        cover_image_task = None
+        if user:
+            cover_image_task = get_unsplash_image_async(trip_request.destination)
+
+        # Chạy song song (2 hoặc 3 task tuỳ có user hay không)
+        if cover_image_task:
+            destination_weather, enriched_plan, cover_image_url = await asyncio.gather(
+                weather_task,
+                enrichment_task,
+                cover_image_task
+            )
+        else:
+            destination_weather, enriched_plan = await asyncio.gather(
+                weather_task,
+                enrichment_task
+            )
+            cover_image_url = None
+
+        # Cập nhật trip_plan với kết quả
+        trip_plan = enriched_plan
+        trip_plan["weather_forecast"] = destination_weather
+
+        # Thống kê
+        elapsed = time.time() - start_time
+        total_activities = sum(
+            len(day.get("activities", []))
+            for day in trip_plan.get("days", [])
+        )
+        print(f"✅ ASYNC Trip Planning completed (after AI) in {elapsed:.2f} seconds")
+        print(f"Trip plan generated with {total_activities} activities!")
+
+        # ========== SAVE TO FIRESTORE IF USER AUTHENTICATED ==========
         trip_id = None
         if user:
             trip_id = f"{user['uid']}_{int(datetime.now().timestamp())}"
-            
-            # Get Unsplash cover image for the trip (async)
-            print("Fetching Unsplash cover image (async)...")
-            cover_image_url = await get_unsplash_image_async(trip_request.destination)
+
             if cover_image_url:
-                print(f"✓ Cover image fetched: {cover_image_url[:50]}...")
+                print(f"✓ Using cover image: {cover_image_url[:50]}...")
             else:
                 print("⚠ No cover image found")
-            
+
             trip_data = {
                 "trip_id": trip_id,
                 "user_id": user['uid'],
@@ -1057,37 +1172,40 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
                 "trip_plan": trip_plan,
                 "created_at": datetime.now().isoformat(),
                 "rating": 0,
-                # Catalog feature fields
                 "is_public": False,
                 "views_count": 0,
                 "likes_count": 0,
                 "category_tags": trip_request.categories or [],
                 "cover_image": cover_image_url,
             }
-            
-            # Save to user's trips subcollection
-            firebase_db.collection("users").document(user['uid']).collection("trips").document(trip_id).set(trip_data)
+
+            firebase_db.collection("users") \
+                .document(user['uid']) \
+                .collection("trips") \
+                .document(trip_id) \
+                .set(trip_data)
+
             print(f"✓ Trip saved to Firestore: {trip_id}")
-            
-            # Add trip_id and cover_image to response
+
+            # add metadata vào response
             trip_plan["trip_id"] = trip_id
             trip_plan["cover_image"] = cover_image_url
-        
-        # Log timing info
+
+        # Log tổng thời gian
         elapsed = time.time() - start_time
         print(f"\n{'='*60}")
         print(f"✅ ASYNC Trip Planning completed in {elapsed:.2f} seconds")
         print(f"{'='*60}\n")
-        
+
         return JSONResponse(content=trip_plan)
-    
+
     except json.JSONDecodeError as e:
         print(f"JSON parsing error: {e}")
         return JSONResponse(
             status_code=500,
             content={"error": "Lỗi parse JSON từ AI", "details": str(e)}
         )
-    
+
     except Exception as e:
         print(f"Unexpected error: {e}")
         return JSONResponse(
