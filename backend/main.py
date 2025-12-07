@@ -762,7 +762,7 @@ async def enrich_activities_parallel(
     total_activities = sum(len(v) for v in place_to_activities.values())
 
     print(
-        f"📍 Enriching {total_activities} activities across "
+        f"Enriching {total_activities} activities across "
         f"{total_places} unique places in parallel batches of {batch_size}..."
     )
 
@@ -1101,7 +1101,7 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         trip_plan = json.loads(json_str)
 
         # ========== RUN WEATHER + ENRICHMENT (+ COVER) IN PARALLEL ==========
-        print("🚀 Running weather fetch, activity enrichment, and cover image fetch in parallel...")
+        print("Running weather fetch, activity enrichment, and cover image fetch in parallel...")
 
         # 1) Task weather
         weather_task = fetch_destination_weather(trip_request)
@@ -1194,7 +1194,7 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         # Log tổng thời gian
         elapsed = time.time() - start_time
         print(f"\n{'='*60}")
-        print(f"✅ ASYNC Trip Planning completed in {elapsed:.2f} seconds")
+        print(f"ASYNC Trip Planning completed in {elapsed:.2f} seconds")
         print(f"{'='*60}\n")
 
         return JSONResponse(content=trip_plan)
