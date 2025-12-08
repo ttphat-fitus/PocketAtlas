@@ -6,7 +6,7 @@
 
 ### Trip Planning
 - **AI-Powered Generation**: Multi-day, day-by-day itineraries using Google Gemini AI
-- **Smart Location Enrichment**: Automatic place details via TrackAsia API (addresses, coordinates, ratings, photos)
+- **Smart Location Enrichment**: Automatic place details via Google Maps API (addresses, coordinates, ratings, photos)
 - **Weather Forecasting**: Integrated weather predictions for your trip dates
 - **Budget Customization**: Low, medium, or high budget options with cost estimates
 - **Activity Level**: Tailor trips based on your preferred activity intensity (low/medium/high)
