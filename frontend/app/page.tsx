@@ -37,34 +37,9 @@ export default function LandingPage() {
       <div className="navbar bg-white shadow-sm">
         <div className="navbar-start">
           <div className="flex items-center gap-2 ml-4">
-            {/* Language Toggle */}
-            <div className="flex gap-1">
-              <button
-                onClick={() => setLanguage("en")}
-                className={`btn btn-sm ${
-                  language === "en"
-                    ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0 hover:from-blue-600 hover:to-purple-600"
-                    : "btn-ghost"
-                }`}
-              >
-                EN
-              </button>
-              <button
-                onClick={() => setLanguage("vi")}
-                className={`btn btn-sm ${
-                  language === "vi"
-                    ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0 hover:from-blue-600 hover:to-purple-600"
-                    : "btn-ghost"
-                }`}
-              >
-                VI
-              </button>
-            </div>
-
             {/* Navigation Links */}
-            <div className="divider divider-horizontal mx-1"></div>
             <a href="/explore" className="btn btn-ghost btn-sm font-semibold">
-              {language === "en" ? "Explore" : "Khám phá"}
+              Khám phá
             </a>
             <a href="/blog" className="btn btn-ghost btn-sm font-semibold">
               Blog

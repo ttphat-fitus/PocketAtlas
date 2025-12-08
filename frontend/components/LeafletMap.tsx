@@ -164,7 +164,12 @@ export default function LeafletMap({ locations, showRoute = true, height = "400p
     // Cleanup
     return () => {
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        try {
+          mapInstanceRef.current.off();
+          mapInstanceRef.current.remove();
+        } catch (e) {
+          console.warn('Map cleanup warning:', e);
+        }
         mapInstanceRef.current = null;
       }
     };

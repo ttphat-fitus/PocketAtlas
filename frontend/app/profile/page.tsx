@@ -178,28 +178,65 @@ export default function ProfilePage() {
 
       if (response.ok) {
         const data = await response.json();
-        setProfile(data);
-        setDisplayName(data.displayName || user?.displayName || "");
-        setBio(data.bio || "");
-        setLocation(data.location || "");
-        setPhotoURL(data.photoURL || user?.photoURL || "");
-      } else {
-        // Initialize with user data if profile doesn't exist
-        const userData = {
-          uid: user.uid,
-          email: user.email || "",
-          displayName: user.displayName || "",
-          photoURL: user.photoURL || "",
-          bio: "",
-          location: "",
-          interests: [],
+        const profileData = data.profile || data;
+        
+        // Ensure we have all the data with proper fallbacks
+        const completeProfile = {
+          uid: profileData.uid || user.uid,
+          email: profileData.email || user.email || "",
+          displayName: profileData.username || profileData.displayName || user?.displayName || "",
+          photoURL: profileData.photo_url || profileData.photoURL || user?.photoURL || "",
+          bio: profileData.bio || "",
+          location: profileData.location || "",
+          interests: profileData.interests || [],
         };
-        setProfile(userData);
-        setDisplayName(user.displayName || "");
-        setPhotoURL(user.photoURL || "");
+        
+        setProfile(completeProfile);
+        setDisplayName(completeProfile.displayName);
+        setBio(completeProfile.bio);
+        setLocation(completeProfile.location);
+        setPhotoURL(completeProfile.photoURL);
+        
+        // Cache to localStorage for faster reload
+        localStorage.setItem(`profile_${user.uid}`, JSON.stringify(completeProfile));
+      } else {
+        // Try to load from localStorage if API fails
+        const cached = localStorage.getItem(`profile_${user.uid}`);
+        if (cached) {
+          const cachedProfile = JSON.parse(cached);
+          setProfile(cachedProfile);
+          setDisplayName(cachedProfile.displayName);
+          setBio(cachedProfile.bio);
+          setLocation(cachedProfile.location);
+          setPhotoURL(cachedProfile.photoURL);
+        } else {
+          // Initialize with user data if profile doesn't exist
+          const userData = {
+            uid: user.uid,
+            email: user.email || "",
+            displayName: user.displayName || "",
+            photoURL: user.photoURL || "",
+            bio: "",
+            location: "",
+            interests: [],
+          };
+          setProfile(userData);
+          setDisplayName(user.displayName || "");
+          setPhotoURL(user.photoURL || "");
+        }
       }
     } catch (err) {
       console.error("Failed to fetch profile:", err);
+      // Try to load from localStorage
+      const cached = localStorage.getItem(`profile_${user.uid}`);
+      if (cached) {
+        const cachedProfile = JSON.parse(cached);
+        setProfile(cachedProfile);
+        setDisplayName(cachedProfile.displayName);
+        setBio(cachedProfile.bio);
+        setLocation(cachedProfile.location);
+        setPhotoURL(cachedProfile.photoURL);
+      }
     } finally {
       setLoading(false);
     }
@@ -218,7 +255,7 @@ export default function ProfilePage() {
 
       if (response.ok) {
         const data = await response.json();
-        setLikedTrips(data.trips || []);
+        setLikedTrips(data.liked_trips || []);
       }
     } catch (err) {
       console.error("Failed to fetch liked trips:", err);
@@ -243,16 +280,34 @@ export default function ProfilePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          displayName: displayName || profile?.displayName || "",
+          username: displayName || profile?.displayName || "",
           bio: bio || "",
           location: location || "",
-          photoURL: photoURL || "",
+          photo_url: photoURL || "",
         }),
       });
 
       if (response.ok) {
-        const updated = await response.json();
-        setProfile(updated);
+        const data = await response.json();
+        if (data.profile) {
+          const updatedProfile = {
+            uid: data.profile.uid || user.uid,
+            email: data.profile.email || user.email || "",
+            displayName: data.profile.username || displayName || "",
+            photoURL: data.profile.photo_url || photoURL || "",
+            bio: data.profile.bio || bio || "",
+            location: data.profile.location || location || "",
+            interests: [],
+          };
+          setProfile(updatedProfile);
+          setDisplayName(updatedProfile.displayName);
+          setPhotoURL(updatedProfile.photoURL);
+          setBio(updatedProfile.bio);
+          setLocation(updatedProfile.location);
+          
+          // Save to localStorage
+          localStorage.setItem(`profile_${user.uid}`, JSON.stringify(updatedProfile));
+        }
         setIsEditing(false);
         // Show success briefly
         const successMsg = language === "en" ? "Profile saved!" : "Đã lưu hồ sơ!";
@@ -296,24 +351,30 @@ export default function ProfilePage() {
           </h1>
         </div>
         <div className="navbar-end mr-4 flex gap-2">
-          <button onClick={() => router.push("/trips")} className="btn btn-ghost btn-sm">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button 
+            onClick={() => router.push("/trips")} 
+            className="btn btn-sm bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none hover:from-blue-600 hover:to-purple-700 shadow-lg gap-2"
+          >
+            {/* <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
+            </svg> */}
             {language === "en" ? "My Trips" : "Chuyến đi"}
           </button>
-          {!isEditing && (
-            <button onClick={() => setIsEditing(true)} className="btn btn-primary btn-sm">
-              {language === "en" ? "Edit Profile" : "Chỉnh sửa"}
-            </button>
-          )}
         </div>
       </div>
 
       <div className="container mx-auto p-6 max-w-5xl">
         {/* Profile Card */}
         <div className="card bg-white shadow-xl mb-6">
-          <div className="card-body">
+          <div className="card-body relative">
+            {!isEditing && (
+            <button 
+              onClick={() => setIsEditing(true)} 
+              className="btn btn-primary btn-sm absolute top-4 right-4" // Thêm absolute top-4 right-4
+            >
+              {language === "en" ? "Edit Profile" : "Chỉnh sửa"}
+            </button>
+          )}
             <div className="flex flex-col md:flex-row gap-6">
               {/* Avatar */}
               <div className="flex flex-col items-center gap-4">
@@ -434,20 +495,32 @@ export default function ProfilePage() {
                       </div>
                     )}
                     
-                    {/* Stats */}
-                    {userStats && (
-                      <div className="flex gap-6 text-sm">
-                        <div>
-                          <span className="font-bold text-blue-600">{userStats.trips_count}</span>
-                          <span className="text-gray-600 ml-1">{language === "en" ? "trips" : "chuyến đi"}</span>
+                    {/* Stats - Also show from profile data if userStats not available */}
+                    {(userStats || profile) && (
+                      <div className="grid grid-cols-3 gap-4 mt-3">
+                        <div className="text-center p-3 bg-blue-50 rounded-lg">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {userStats?.trips_count ?? profile?.total_trips ?? 0}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            {language === "en" ? "Trips" : "Chuyến đi"}
+                          </div>
                         </div>
-                        <div>
-                          <span className="font-bold text-green-600">{userStats.public_trips}</span>
-                          <span className="text-gray-600 ml-1">{language === "en" ? "public" : "công khai"}</span>
+                        <div className="text-center p-3 bg-green-50 rounded-lg">
+                          <div className="text-2xl font-bold text-green-600">
+                            {userStats?.public_trips ?? profile?.public_trips ?? 0}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            {language === "en" ? "Public" : "Công khai"}
+                          </div>
                         </div>
-                        <div>
-                          <span className="font-bold text-pink-600">{userStats.total_likes}</span>
-                          <span className="text-gray-600 ml-1">{language === "en" ? "likes" : "lượt thích"}</span>
+                        <div className="text-center p-3 bg-pink-50 rounded-lg">
+                          <div className="text-2xl font-bold text-pink-600">
+                            {userStats?.total_likes ?? profile?.liked_trips ?? 0}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            {language === "en" ? "Likes" : "Yêu thích"}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -608,37 +681,64 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* Liked Trips */}
-            <div className="card bg-white shadow-xl">
+            {/* Featured Liked Trips */}
+            <div className="card bg-gradient-to-br from-purple-50 to-pink-50 shadow-xl border-2 border-purple-200">
               <div className="card-body">
-                <h3 className="text-2xl font-bold mb-4">
-                  {language === "en" ? "Liked Trips" : "Chuyến Đi Yêu Thích"}
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-2xl font-bold flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    {language === "en" ? "Featured Liked Trips" : "Chuyến Đi Yêu Thích Nổi Bật"}
+                  </h3>
+                </div>
                 {likedTrips.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {likedTrips.map((trip) => (
                       <div
                         key={trip.trip_id}
-                        className="card bg-base-100 shadow-md hover:shadow-xl cursor-pointer transition-shadow"
+                        className="card bg-white shadow-lg hover:shadow-2xl cursor-pointer transition-all transform hover:-translate-y-1 duration-200 border border-purple-100"
                         onClick={() => router.push(`/trip/explore/${trip.trip_id}?userId=${user?.uid}`)}
                       >
                         {trip.cover_image && (
-                          <figure className="h-48">
+                          <figure className="h-48 relative overflow-hidden">
                             <img src={trip.cover_image} alt={trip.trip_name} className="w-full h-full object-cover" />
+                            {/* <div className="absolute top-2 right-2">
+                              <div className="badge badge-error gap-1">
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            </div> */}
                           </figure>
                         )}
                         <div className="card-body p-4">
-                          <h4 className="card-title text-base">{trip.trip_name || trip.destination}</h4>
-                          <p className="text-sm text-gray-600">
+                          <h4 className="card-title text-base font-bold">{trip.trip_name || trip.destination}</h4>
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
                             {trip.duration} {language === "en" ? "days" : "ngày"}
-                          </p>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    {language === "en" ? "No liked trips yet" : "Chưa có chuyến đi yêu thích"}
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-500 font-medium">
+                      {language === "en" ? "No liked trips yet" : "Chưa có chuyến đi yêu thích"}
+                    </p>
+                    <p className="text-gray-400 text-sm mt-2">
+                      {language === "en" ? "Explore trips and save your favorites!" : "Khám phá các chuyến đi và lưu yêu thích!"}
+                    </p>
                   </div>
                 )}
               </div>

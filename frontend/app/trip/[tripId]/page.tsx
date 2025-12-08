@@ -40,6 +40,14 @@ const formatDate = (dateString: string): string => {
   return `${day}/${month}/${year}`;
 };
 
+// Format price display
+const formatPrice = (price: string): string => {
+  if (!price || price === '0đ' || price === '0 đ' || price.toLowerCase() === 'free') {
+    return 'Miễn phí';
+  }
+  return price;
+};
+
 // Export to Google Calendar
 const exportToGoogleCalendar = (tripData: any, tripPlan: any) => {
   const startDate = new Date(tripData.start_date);
@@ -238,7 +246,7 @@ function SortableActivity({ activity, id, language }: { activity: Activity; id: 
                     </div>
                   )}
                 </div>
-                <div className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full whitespace-nowrap">{activity.estimated_cost}</div>
+                <div className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full whitespace-nowrap">{formatPrice(activity.estimated_cost)}</div>
               </div>
               <p className="text-gray-700 text-sm mb-2">{activity.description}</p>
               {activity.tips && (
@@ -455,20 +463,6 @@ export default function TripDetailPage() {
           </h1>
         </div>
         <div className="navbar-end">
-          <div className="flex gap-1 mr-4">
-            <button
-              onClick={() => setLanguage("en")}
-              className={`btn btn-sm ${language === "en" ? "btn-primary" : "btn-ghost"}`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setLanguage("vi")}
-              className={`btn btn-sm ${language === "vi" ? "btn-primary" : "btn-ghost"}`}
-            >
-              VI
-            </button>
-          </div>
         </div>
       </div>
 
@@ -711,7 +705,7 @@ export default function TripDetailPage() {
                       {language === "en" ? "Weather Forecast" : "Dự báo thời tiết"}
                     </h3>
                     <div className="space-y-2">
-                      {tripPlan.weather_forecast.map((weather, idx) => (
+                      {tripPlan.weather_forecast?.map((weather, idx) => (
                         <div key={idx} className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-3 border border-blue-100">
                           <div className="flex justify-between items-center mb-1">
                             <div className="text-sm font-semibold text-gray-700">
@@ -740,14 +734,30 @@ export default function TripDetailPage() {
                       </svg>
                       {language === "en" ? "Packing List" : "Danh sách đồ"}
                     </h3>
-                    <ul className="space-y-1 text-sm">
-                      {tripPlan.packing_list.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-primary">•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    {(() => {
+                      const packingList = tripPlan.packing_list;
+                      if (!packingList) {
+                        return <p className="text-sm text-gray-500 italic">Chưa có danh sách đồ dùng</p>;
+                      }
+                      // Handle if it's a string (parse it)
+                      const items = Array.isArray(packingList) ? packingList : [];
+                      const validItems = items.filter(item => typeof item === 'string' && item.trim());
+                      
+                      if (validItems.length === 0) {
+                        return <p className="text-sm text-gray-500 italic">Chưa có danh sách đồ dùng</p>;
+                      }
+                      
+                      return (
+                        <ul className="space-y-1 text-sm">
+                          {validItems.map((item, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <span className="text-primary">•</span>
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      );
+                    })()}
                   </div>
 
                   <div>
@@ -757,14 +767,30 @@ export default function TripDetailPage() {
                       </svg>
                       {language === "en" ? "Travel Tips" : "Mẹo du lịch"}
                     </h3>
-                    <ul className="space-y-1 text-sm">
-                      {tripPlan.travel_tips.map((tip, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-primary">•</span>
-                          <span>{tip}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    {(() => {
+                      const travelTips = tripPlan.travel_tips;
+                      if (!travelTips) {
+                        return <p className="text-sm text-gray-500 italic">Chưa có mẹo du lịch</p>;
+                      }
+                      // Handle if it's a string (parse it)
+                      const tips = Array.isArray(travelTips) ? travelTips : [];
+                      const validTips = tips.filter(tip => typeof tip === 'string' && tip.trim());
+                      
+                      if (validTips.length === 0) {
+                        return <p className="text-sm text-gray-500 italic">Chưa có mẹo du lịch</p>;
+                      }
+                      
+                      return (
+                        <ul className="space-y-1 text-sm">
+                          {validTips.map((tip, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <span className="text-primary">•</span>
+                              <span>{tip}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -775,7 +801,7 @@ export default function TripDetailPage() {
           <div className="lg:col-span-3">
             {/* Days Timeline */}
             <div className="space-y-6">
-              {tripPlan.days.map((day, dayIndex) => (
+              {tripPlan.days?.map((day, dayIndex) => (
                 <div key={dayIndex} className="card bg-white shadow-xl">
                   <div className="card-body">
                     <div className="flex items-center gap-3 mb-4">
@@ -808,10 +834,10 @@ export default function TripDetailPage() {
                       onDragEnd={(event: DragEndEvent) => handleDragEnd(event, dayIndex)}
                     >
                       <SortableContext
-                        items={day.activities.map((_, idx) => `${dayIndex}-${idx}`)}
+                        items={day.activities?.map((_, idx) => `${dayIndex}-${idx}`) || []}
                         strategy={verticalListSortingStrategy}
                       >
-                        {day.activities.map((activity, actIdx) => (
+                        {day.activities?.map((activity, actIdx) => (
                           <SortableActivity
                             key={`${dayIndex}-${actIdx}`}
                             id={`${dayIndex}-${actIdx}`}

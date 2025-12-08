@@ -173,28 +173,6 @@ export default function ExplorePage() {
           </h1>
         </div>
         <div className="navbar-end mr-4">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setLanguage("en")}
-              className={`btn btn-sm ${
-                language === "en"
-                  ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0 hover:from-blue-600 hover:to-purple-600"
-                  : "btn-ghost"
-              }`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setLanguage("vi")}
-              className={`btn btn-sm ${
-                language === "vi"
-                  ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0 hover:from-blue-600 hover:to-purple-600"
-                  : "btn-ghost"
-              }`}
-            >
-              VI
-            </button>
-          </div>
         </div>
       </div>
 

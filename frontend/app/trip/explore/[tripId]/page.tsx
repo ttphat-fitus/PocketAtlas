@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useLanguage } from "../../../../contexts/LanguageContext";
+import { useAuth } from "../../../../contexts/AuthContext";
 import RouteMap from "../../../../components/RouteMap";
 
 interface PlaceDetails {
@@ -59,6 +60,7 @@ export default function ExploreDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const { language, t } = useLanguage();
+  const { user } = useAuth();
   
   const tripId = params.tripId as string;
   const userId = searchParams.get("userId");
@@ -114,6 +116,17 @@ export default function ExploreDetailPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_id: userId || "anonymous" }),
         });
+        
+        // Check if current user has liked this trip
+        if (user?.uid) {
+          const likeCheckResponse = await fetch(
+            `http://localhost:8000/api/trip/${tripId}/like-status?user_id=${user.uid}`
+          );
+          if (likeCheckResponse.ok) {
+            const likeData = await likeCheckResponse.json();
+            setLiked(likeData.liked || false);
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load trip");
       } finally {
@@ -122,16 +135,18 @@ export default function ExploreDetailPage() {
     };
 
     fetchTrip();
-  }, [tripId, userId]);
+  }, [tripId, userId, user]);
 
   const handleLike = async () => {
-    if (!tripId || !userId) return;
+    if (!tripId) return;
+    
+    const currentUserId = user?.uid || "anonymous";
 
     try {
       const response = await fetch(`http://localhost:8000/api/trip/${tripId}/like`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId || "anonymous" }),
+        body: JSON.stringify({ user_id: currentUserId }),
       });
 
       if (response.ok) {

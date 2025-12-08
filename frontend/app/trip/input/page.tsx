@@ -136,20 +136,6 @@ export default function TripInputPage() {
         </div>
 
         <div className="navbar-end">
-          <div className="flex gap-1 mr-4">
-            <button
-              onClick={() => setLanguage("en")}
-              className={`btn btn-sm ${language === "en" ? "btn-primary" : "btn-ghost"}`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setLanguage("vi")}
-              className={`btn btn-sm ${language === "vi" ? "btn-primary" : "btn-ghost"}`}
-            >
-              VI
-            </button>
-          </div>
         </div>
       </div>
 

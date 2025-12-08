@@ -246,32 +246,18 @@ export default function MyTripsPage() {
 
         <div className="navbar-center">
           <a className="text-2xl font-bold text-transparent bg-clip-text bg-linear-to-r from-blue-500 via-teal-500 to-green-500">
-            {language === "en" ? "My Trips" : "Chuyến đi của tôi"}
+            Chuyến đi của tôi
           </a>
         </div>
 
         <div className="navbar-end">
-          <div className="flex gap-1 mr-4">
-            <button
-              onClick={() => setLanguage("en")}
-              className={`btn btn-sm ${language === "en" ? "btn-primary" : "btn-ghost"}`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setLanguage("vi")}
-              className={`btn btn-sm ${language === "vi" ? "btn-primary" : "btn-ghost"}`}
-            >
-              VI
-            </button>
-          </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">
-            {language === "en" ? "My Trips" : "Chuyến đi của tôi"}
+            Chuyến đi của tôi
           </h1>
           <a href="/trip/input" className="btn btn-primary">
             {language === "en" ? "+ New Trip" : "+ Tạo chuyến đi mới"}

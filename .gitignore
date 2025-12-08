@@ -1,39 +1,53 @@
+# Git
 .gitignore
-key/
-*.json
-.package exceptions
-!package.json
-.package-lock exceptions
-!package-lock.json
-!frontend/package-lock.json
+
+# Backend - Firebase keys and Python cache
+backend/key/
+backend/**/__pycache__/
+backend/.venv/
+backend/venv/
+backend/env/
+
+# Environment variables
 .env
-__pycache__/
-.vscode/
-node_modules/
-dist/
-.DS_Store
 .env.local
 .env.*.local
-.next/
-out/
-.vercel/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-.idea/
+
+# JSON config files (except package.json and package-lock.json)
+*.json
+!package.json
+!package-lock.json
+!frontend/package-lock.json
+!backend/firebase/firebase_config.json
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+frontend/.vercel/
+
+# IDE
 .vscode/
+.idea/
+.DS_Store
+
+# Python
 *.py[cod]
 *.egg-info/
-.venv/
-venv/
-env/
 pip-wheel-metadata/
-__pycache__/
 .pytest_cache/
 .mypy_cache/
 .coverage
 coverage/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Cache
 .eslintcache
 .cache
-*.log

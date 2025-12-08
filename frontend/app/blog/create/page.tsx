@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../contexts/AuthContext";
-import { useLanguage } from "../../../contexts/LanguageContext";
 
 interface BlogFormData {
   title: string;
@@ -31,7 +30,6 @@ const CATEGORIES = [
 export default function CreateBlogPage() {
   const router = useRouter();
   const { user, loading: authLoading, getIdToken } = useAuth();
-  const { language, setLanguage, t } = useLanguage();
   
   const [formData, setFormData] = useState<BlogFormData>({
     title: "",
@@ -102,9 +100,7 @@ export default function CreateBlogPage() {
 
   const handleGenerateWithAI = async () => {
     if (!formData.trip_id) {
-      alert(language === "en" 
-        ? "Please select a trip to generate blog content" 
-        : "Vui lòng chọn chuyến đi để tạo nội dung blog");
+      alert("Vui lòng chọn chuyến đi để tạo nội dung blog");
       return;
     }
 
@@ -135,15 +131,11 @@ export default function CreateBlogPage() {
           tags: data.tags || [],
         });
       } else {
-        alert(language === "en" 
-          ? "Failed to generate blog content. Please try again." 
-          : "Không thể tạo nội dung blog. Vui lòng thử lại.");
+        alert("Không thể tạo nội dung blog. Vui lòng thử lại.");
       }
     } catch (err) {
       console.error("Error generating blog:", err);
-      alert(language === "en" 
-        ? "An error occurred while generating content." 
-        : "Đã xảy ra lỗi khi tạo nội dung.");
+      alert("Đã xảy ra lỗi khi tạo nội dung.");
     } finally {
       setAiGenerating(false);
     }
@@ -153,9 +145,7 @@ export default function CreateBlogPage() {
     e.preventDefault();
     
     if (!formData.title || !formData.content) {
-      alert(language === "en" 
-        ? "Please fill in the required fields (Title and Content)" 
-        : "Vui lòng điền các trường bắt buộc (Tiêu đề và Nội dung)");
+      alert("Vui lòng điền các trường bắt buộc (Tiêu đề và Nội dung)");
       return;
     }
 
@@ -176,15 +166,11 @@ export default function CreateBlogPage() {
         const data = await response.json();
         router.push(`/blog/${data.slug}`);
       } else {
-        alert(language === "en" 
-          ? "Failed to create blog post. Please try again." 
-          : "Không thể tạo bài blog. Vui lòng thử lại.");
+        alert("Không thể tạo bài blog. Vui lòng thử lại.");
       }
     } catch (err) {
       console.error("Error creating blog:", err);
-      alert(language === "en" 
-        ? "An error occurred while creating the blog post." 
-        : "Đã xảy ra lỗi khi tạo bài blog.");
+      alert("Đã xảy ra lỗi khi tạo bài blog.");
     } finally {
       setIsSubmitting(false);
     }
@@ -207,29 +193,15 @@ export default function CreateBlogPage() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            {language === "en" ? "Back to Blog" : "Quay lại Blog"}
+            Quay lại Blog
           </a>
         </div>
         <div className="navbar-center">
           <h1 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500">
-            {language === "en" ? "Create Blog Post" : "Tạo Bài Blog"}
+            Tạo Bài Blog
           </h1>
         </div>
         <div className="navbar-end">
-          <div className="flex gap-1 mr-4">
-            <button
-              onClick={() => setLanguage("en")}
-              className={`btn btn-sm ${language === "en" ? "btn-primary" : "btn-ghost"}`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setLanguage("vi")}
-              className={`btn btn-sm ${language === "vi" ? "btn-primary" : "btn-ghost"}`}
-            >
-              VI
-            </button>
-          </div>
         </div>
       </div>
 
@@ -245,13 +217,11 @@ export default function CreateBlogPage() {
               </div>
               <div className="flex-1">
                 <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                  {language === "en" ? "AI-Powered Blog Generation" : "Tạo Blog bằng AI"}
-                  <span className="badge badge-primary badge-sm">NEW</span>
+                  Tạo Blog bằng AI
+                  <span className="badge badge-primary badge-sm">MỚI</span>
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
-                  {language === "en" 
-                    ? "Generate blog content automatically from your trip experiences" 
-                    : "Tự động tạo nội dung blog từ trải nghiệm chuyến đi của bạn"}
+                  Tự động tạo nội dung blog từ trải nghiệm chuyến đi của bạn
                 </p>
               </div>
             </div>
@@ -263,7 +233,7 @@ export default function CreateBlogPage() {
                 onChange={(e) => setFormData({ ...formData, trip_id: e.target.value })}
               >
                 <option value="">
-                  {language === "en" ? "Select a trip..." : "Chọn chuyến đi..."}
+                  Chọn chuyến đi...
                 </option>
                 {trips.map((trip) => (
                   <option key={trip.trip_id} value={trip.trip_id}>
@@ -280,14 +250,14 @@ export default function CreateBlogPage() {
                 {aiGenerating ? (
                   <>
                     <span className="loading loading-spinner loading-sm"></span>
-                    {language === "en" ? "Generating..." : "Đang tạo..."}
+                    Đang tạo...
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    {language === "en" ? "Generate with AI" : "Tạo bằng AI"}
+                    Tạo bằng AI
                   </>
                 )}
               </button>
@@ -305,7 +275,7 @@ export default function CreateBlogPage() {
                 <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                {language === "en" ? "Cover Image" : "Ảnh Bìa"}
+                Ảnh Bìa
               </h3>
               
               <input
@@ -340,24 +310,24 @@ export default function CreateBlogPage() {
             </div>
           </div>
 
-          {/* Step 2: Title & Summary with Language Toggle */}
+          {/* Step 2: Title & Summary */}
           <div className="card bg-white shadow-md hover:shadow-lg transition-shadow">
             <div className="card-body p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-bold text-base flex items-center gap-2">
                   <span className="badge badge-primary">2</span>
-                  <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  {language === "en" ? "Title & Summary" : "Tiêu đề & Tóm tắt"}
+                <svg className="w-5 h-5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Tiêu đề & Tóm tắt
                 </h3>
-                <div className="flex gap-2">
+                {/* <div className="flex gap-2">
                   <button type="button" onClick={() => setUseAI(false)} className={`btn btn-xs ${useAI === false ? 'btn-primary' : 'btn-ghost'}`}>EN</button>
                   <button type="button" onClick={() => setUseAI(true)} className={`btn btn-xs ${useAI === true ? 'btn-primary' : 'btn-ghost'}`}>VI</button>
-                </div>
+                </div> */}
               </div>
 
-              {useAI === false ? (
+              {/* {useAI === false ? (
                 <div className="space-y-3">
                   <div className="form-control">
                     <input
@@ -376,25 +346,25 @@ export default function CreateBlogPage() {
                     onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
                   />
                 </div>
-              ) : (
+              ) : ( */}
                 <div className="space-y-3">
                   <div className="form-control">
                     <input
                       type="text"
-                      placeholder="Tiêu đề (Tiếng Việt)"
-                      className="input input-bordered input-sm"
+                      placeholder="Tiêu đề"
+                      className="input input-bordered input-sm w-full"
                       value={formData.title_vi}
                       onChange={(e) => setFormData({ ...formData, title_vi: e.target.value })}
                     />
                   </div>
                   <textarea
-                    placeholder="Tóm tắt (Tiếng Việt)"
-                    className="textarea textarea-bordered textarea-sm h-20"
+                    placeholder="Tóm tắt"
+                    className="textarea textarea-bordered h-32 w-full font-mono text-sm"
                     value={formData.excerpt_vi}
                     onChange={(e) => setFormData({ ...formData, excerpt_vi: e.target.value })}
                   />
                 </div>
-              )}
+
             </div>
           </div>
 
@@ -403,15 +373,15 @@ export default function CreateBlogPage() {
             <div className="card-body p-4">
               <h3 className="font-bold text-base mb-3 flex items-center gap-2">
                 <span className="badge badge-primary">3</span>
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-                {language === "en" ? "Category & Tags" : "Danh mục & Thẻ"}
+                Danh mục & Thẻ
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              <div className="w-full mb-3">
                 <select
-                  className="select select-bordered select-sm"
+                  className="select select-bordered select-sm w-full"
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 >
@@ -419,22 +389,6 @@ export default function CreateBlogPage() {
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
-
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder={language === "en" ? "Add tag..." : "Thêm thẻ..."}
-                    className="input input-bordered input-sm flex-1"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddTag())}
-                  />
-                  <button type="button" onClick={handleAddTag} className="btn btn-primary btn-sm btn-square">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
-                </div>
               </div>
 
               {formData.tags.length > 0 && (
@@ -452,39 +406,24 @@ export default function CreateBlogPage() {
             </div>
           </div>
 
-          {/* Step 4: Content with Language Toggle */}
+          {/* Step 4: Content */}
           <div className="card bg-white shadow-md hover:shadow-lg transition-shadow">
             <div className="card-body p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-base flex items-center gap-2">
-                  <span className="badge badge-primary">4</span>
-                  <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  {language === "en" ? "Content (Markdown)" : "Nội dung (Markdown)"}
-                </h3>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setPreviewMode(false)} className={`btn btn-xs ${previewMode === false ? 'btn-primary' : 'btn-ghost'}`}>EN</button>
-                  <button type="button" onClick={() => setPreviewMode(true)} className={`btn btn-xs ${previewMode === true ? 'btn-primary' : 'btn-ghost'}`}>VI</button>
-                </div>
-              </div>
+              <h3 className="font-bold text-base flex items-center gap-2 mb-3">
+                <span className="badge badge-primary">4</span>
+                <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Nội dung (Markdown)
+              </h3>
 
-              {previewMode === false ? (
-                <textarea
-                  placeholder="Write content in English using Markdown format..."
-                  className="textarea textarea-bordered textarea-sm h-60 font-mono text-xs"
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  required
-                />
-              ) : (
-                <textarea
-                  placeholder="Viết nội dung bằng tiếng Việt sử dụng định dạng Markdown..."
-                  className="textarea textarea-bordered textarea-sm h-60 font-mono text-xs"
-                  value={formData.content_vi}
-                  onChange={(e) => setFormData({ ...formData, content_vi: e.target.value })}
-                />
-              )}
+              <textarea
+                placeholder="Viết nội dung bằng định dạng Markdown..."
+                className="textarea textarea-bordered h-96 w-full font-mono text-sm"
+                value={formData.content_vi || formData.content}
+                onChange={(e) => setFormData({ ...formData, content_vi: e.target.value, content: e.target.value })}
+                required
+              />
             </div>
           </div>
 
@@ -498,7 +437,7 @@ export default function CreateBlogPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              {language === "en" ? "Cancel" : "Hủy"}
+              Hủy
             </button>
             <button
               type="submit"
@@ -508,14 +447,14 @@ export default function CreateBlogPage() {
               {isSubmitting ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span>
-                  {language === "en" ? "Publishing..." : "Đang đăng..."}
+                  Đang đăng...
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  {language === "en" ? "Publish" : "Đăng"}
+                  Đăng
                 </>
               )}
             </button>

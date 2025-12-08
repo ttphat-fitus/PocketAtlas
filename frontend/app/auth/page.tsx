@@ -63,22 +63,6 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-green-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Language Toggle */}
-        <div className="flex justify-end mb-4 gap-2">
-          <button
-            onClick={() => setLanguage("en")}
-            className={`btn btn-sm ${language === "en" ? "btn-primary" : "btn-ghost"}`}
-          >
-            EN
-          </button>
-          <button
-            onClick={() => setLanguage("vi")}
-            className={`btn btn-sm ${language === "vi" ? "btn-primary" : "btn-ghost"}`}
-          >
-            VI
-          </button>
-        </div>
-
         {!isConfigured && (
           <div className="alert alert-warning mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">

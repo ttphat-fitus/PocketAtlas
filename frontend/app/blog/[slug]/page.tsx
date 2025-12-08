@@ -38,31 +38,17 @@ export default function BlogDetailPage() {
       <div className="navbar bg-white shadow-sm sticky top-0 z-50">
         <div className="navbar-start">
           <a href="/blog" className="btn btn-ghost">
-            ← {language === "en" ? "Back to Blog" : "Quay lại Blog"}
+            ← Quay lại Blog
           </a>
         </div>
 
         <div className="navbar-center">
           <a className="text-xl font-bold text-transparent bg-clip-text bg-linear-to-r from-blue-500 via-teal-500 to-green-500">
-            {language === "en" ? "Travel Blog" : "Blog Du Lịch"}
+            Blog Du Lịch
           </a>
         </div>
 
         <div className="navbar-end">
-          <div className="flex gap-1 mr-4">
-            <button
-              onClick={() => setLanguage("en")}
-              className={`btn btn-sm ${language === "en" ? "btn-primary" : "btn-ghost"}`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setLanguage("vi")}
-              className={`btn btn-sm ${language === "vi" ? "btn-primary" : "btn-ghost"}`}
-            >
-              VI
-            </button>
-          </div>
         </div>
       </div>
 
