@@ -110,44 +110,53 @@ class PodcastService:
                     weather_info += f"- {fc.get('date')} ({fc.get('day_name', '')}): {temp_min}-{temp_max}°C, {condition}, Khả năng mưa: {rain_chance}%\n"
             
             prompt = f"""
-Bạn là hướng dẫn viên du lịch chuyên nghiệp với giọng nói tự nhiên, thân thiện. 
-Hãy tạo nội dung podcast giới thiệu chuyến đi này bằng tiếng Việt.
+Bạn là ATLAS - hướng dẫn viên du lịch thân thiện với giọng nói tự nhiên, ấm áp. 
+Hãy tạo nội dung podcast giới thiệu chuyến đi bằng tiếng Việt.
 
 Thông tin chuyến đi:
 - Điểm đến: {trip_data.get('destination')}
 - Thời gian: {trip_data.get('duration')} ngày
-- Tên chuyến đi: {trip_plan.get('trip_name', '')}
+- Chuyến đi: {trip_plan.get('trip_name', '')}
 - Tổng quan: {trip_plan.get('overview', '')}
 {weather_info}
 
-Lịch trình chi tiết:
+Các địa điểm trong hành trình:
 """
             for day in trip_plan.get("days", []):
                 prompt += f"\nNgày {day['day']}: {day.get('title', '')}\n"
-                for activity in day.get("activities", []):
-                    prompt += f"  - {activity.get('time')}: {activity.get('place')} - {activity.get('description', '')[:100]}\n"
+                activities = day.get("activities", [])[:3]  # Only top 3 per day
+                for activity in activities:
+                    prompt += f"  • {activity.get('place')}\n"
             
             prompt += """
 
-Hãy tạo nội dung podcast với:
-1. Lời chào và giới thiệu địa điểm (30 giây) - giọng điệu vui vẻ, thu hút
-2. Giới thiệu sơ lược về địa điểm, điểm nổi bật
-3. Thông tin thời tiết (nếu có) - nhắc nhở người nghe chuẩn bị phù hợp
-4. Điểm nhấn từng ngày trong lịch trình
-5. Lời kết động viên
+YÊU CẦU QUAN TRỌNG:
+1. Giới thiệu bản thân: "Xin chào, mình là ATLAS" (giọng thân thiện)
+2. CHỈ giới thiệu 3 địa điểm ĐẶC BIỆT NHẤT mỗi ngày - tập trung vào điểm độc đáo
+3. KHÔNG đề cập thời gian cụ thể (như "9:00 - 11:30")
+4. KHÔNG dùng ký hiệu markdown (**, ##, -, •) - chỉ văn nói tự nhiên
+5. Kể như đang tâm sự với bạn bè, không đọc giọng tin tức
+6. Nếu có thông tin thời tiết, nhắc nhở ngắn gọn về chuẩn bị
+
+CẤU TRÚC:
+- Mở đầu: Chào và giới thiệu ATLAS (20 giây)
+- Điểm đến: Nét đặc trưng của nơi này (30 giây)
+- Thời tiết: Nếu có - nhắc nhở nhẹ nhàng (15 giây)
+- Từng ngày: Chỉ 3 điểm đặc biệt nhất, tại sao nên đến (2 phút)
+- Kết: Động viên, hẹn gặp lại (20 giây)
 
 Format JSON:
 {
-  "title": "Tiêu đề podcast",
-  "introduction": "Lời chào mở đầu tự nhiên, thân thiện",
-  "location_overview": "Giới thiệu về địa điểm",
+  "title": "Podcast: [Tên chuyến đi]",
+  "introduction": "Xin chào, mình là ATLAS...",
+  "location_overview": "Giới thiệu nét đặc trưng địa điểm",
   "weather_note": "Thông tin thời tiết (nếu có)",
-  "daily_highlights": "Điểm nhấn các ngày",
+  "daily_highlights": "Điểm nhấn 3 địa điểm đặc biệt mỗi ngày",
   "conclusion": "Lời kết động viên",
-  "full_text": "Toàn bộ nội dung đầy đủ để đọc (kết hợp các phần trên)"
+  "full_text": "Toàn bộ nội dung đầy đủ - KHÔNG có markdown syntax"
 }
 
-Giọng điệu: Tự nhiên như đang trò chuyện, nhiệt tình nhưng không quá phô trương.
+QUAN TRỌNG: full_text phải là văn nói hoàn toàn tự nhiên, không có **, ##, hay bất kỳ ký hiệu markdown nào.
 CHỈ TRẢ VỀ JSON, KHÔNG TEXT KHÁC.
 """
             

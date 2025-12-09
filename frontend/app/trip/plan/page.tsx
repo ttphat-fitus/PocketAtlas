@@ -583,9 +583,9 @@ export default function TripPlanPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 py-8 max-w-7xl mobile-container">
         {/* Header Card */}
-        <div className="card bg-white shadow-xl mb-8">
+        <div className="card bg-white shadow-xl mb-8 mobile-compact">
           <div className="card-body">
             {/* Cover Image */}
             {tripPlan.cover_image && (
@@ -600,10 +600,10 @@ export default function TripPlanPage() {
             )}
 
             {/* Title */}
-            <h2 className="text-3xl font-bold mb-6">{tripPlan.trip_name}</h2>
+            <h2 className="text-3xl font-bold mb-6 mobile-heading">{tripPlan.trip_name}</h2>
             
             {/* 6 Badges in One Row - Fill Width */}
-            <div className="flex gap-2 mb-6">
+            <div className="flex flex-wrap gap-2 mb-6">
               {/* Total Cost Card - Larger */}
               <div className="flex items-center gap-2 px-3 py-2.5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg border-2 border-blue-300 shadow-sm flex-1 min-w-0">
                 <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -657,7 +657,7 @@ export default function TripPlanPage() {
               {/* Packing List Button - Compact */}
               <button
                 onClick={() => setShowPackingList(!showPackingList)}
-                className={`flex items-center gap-1.5 px-3 py-2.5 bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg border transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-2.5 bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg border transition-all tap-target ${
                   showPackingList 
                     ? 'border-orange-400 shadow-md scale-105' 
                     : 'border-orange-200 hover:shadow-sm hover:border-orange-300'
@@ -672,7 +672,7 @@ export default function TripPlanPage() {
               {/* Travel Tips Button - Compact */}
               <button
                 onClick={() => setShowTips(!showTips)}
-                className={`flex items-center gap-1.5 px-3 py-2.5 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg border transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-2.5 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg border transition-all tap-target ${
                   showTips 
                     ? 'border-teal-400 shadow-md scale-105' 
                     : 'border-teal-200 hover:shadow-sm hover:border-teal-300'
@@ -687,7 +687,7 @@ export default function TripPlanPage() {
 
             {/* Overview */}
             <div className="mt-6">
-              <p className="text-gray-600 leading-relaxed">{tripPlan.overview}</p>
+              <p className="text-gray-600 leading-relaxed mobile-text-base">{tripPlan.overview}</p>
             </div>
 
           </div>
@@ -695,19 +695,19 @@ export default function TripPlanPage() {
 
         {/* Weather Forecast */}
         {tripPlan.weather_forecast && tripPlan.weather_forecast.length > 0 && (
-          <div className="mt-12 card bg-white shadow-xl">
+          <div className="mt-12 card bg-white shadow-xl mobile-compact">
             <div className="card-body">
               <div className="flex items-center gap-2 mb-4">
                 <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10 2a6 6 0 00-6 6c0 4.314 6 10 6 10s6-5.686 6-10a6 6 0 00-6-6zm0 8a2 2 0 110-4 2 2 0 010 4z"/>
                 </svg>
-                <h3 className="text-2xl font-bold text-gray-800">
+                <h3 className="text-2xl font-bold text-gray-800 mobile-heading">
                   {language === "en" ? "Weather Forecast for Your Trip" : "Dự báo thời tiết cho chuyến đi"}
                 </h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {tripPlan.weather_forecast.map((weather: any, idx: number) => (
-                  <div key={idx} className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-4 shadow-sm border border-blue-100">
+                  <div key={idx} className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-4 shadow-sm border border-blue-100 mobile-full-card">
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <div className="text-sm font-semibold text-gray-700">
@@ -753,7 +753,7 @@ export default function TripPlanPage() {
         <div className="mt-12 grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Day Selector Sidebar */}
           <div className="lg:col-span-1">
-            <div className="card bg-white shadow-lg sticky top-24">
+            <div className="card bg-white shadow-lg sticky top-24 mobile-compact">
               <div className="card-body p-4">
                 <h3 className="card-title text-base mb-3">{language === "en" ? "Schedule" : "Lịch Trình"}</h3>
                 <div className="space-y-2">
@@ -761,7 +761,7 @@ export default function TripPlanPage() {
                     <button
                       key={day.day}
                       onClick={() => setSelectedDay(day.day)}
-                      className={`btn w-full justify-center ${
+                      className={`btn w-full justify-center tap-target ${
                         selectedDay === day.day
                           ? "btn-primary"
                           : "btn-ghost btn-outline"
@@ -777,7 +777,7 @@ export default function TripPlanPage() {
             {/* Items and Tips boxes - directly under Schedule */}
             <div className="mt-4 space-y-4">
               {showPackingList && tripPlan.packing_list && (
-                <div className="card bg-white shadow-lg">
+                <div className="card bg-white shadow-lg mobile-compact">
                   <div className="card-body p-3">
                     <div className="flex items-center gap-1.5 mb-2">
                       <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -799,7 +799,7 @@ export default function TripPlanPage() {
               )}
 
               {showTips && tripPlan.travel_tips && (
-                <div className="card bg-white shadow-lg">
+                <div className="card bg-white shadow-lg mobile-compact">
                   <div className="card-body p-3">
                     <div className="flex items-center gap-1.5 mb-2">
                       <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -827,13 +827,13 @@ export default function TripPlanPage() {
             {/* Route Map */}
             {currentDay && currentDay.activities.some(a => a.place_details?.lat && a.place_details?.lng) && (
               <div className="mb-6">
-                <div className="card bg-white shadow-lg">
+                <div className="card bg-white shadow-lg mobile-compact">
                   <div className="card-body p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                       </svg>
-                      <h3 className="text-lg font-bold text-gray-800">
+                      <h3 className="text-lg font-bold text-gray-800 mobile-heading">
                         {language === "en" ? "Route Map" : "Bản đồ lộ trình"}
                       </h3>
                     </div>
@@ -856,7 +856,7 @@ export default function TripPlanPage() {
             {currentDay && (
               <div>
                 <div className="mb-6">
-                  <h2 className="text-2xl font-bold mb-2">
+                  <h2 className="text-2xl font-bold mb-2 mobile-heading">
                     {language === "en" ? `Day ${currentDay.day}` : `Ngày ${currentDay.day}`}
                   </h2>
                   <div className="divider"></div>

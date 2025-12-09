@@ -510,9 +510,9 @@ export default function TripDetailPage() {
         </div>
       </div>
 
-      <div className="container mx-auto p-6 max-w-7xl">
+      <div className="container mx-auto p-6 max-w-7xl mobile-container">
         {/* Header with title and metadata - UPDATED STRUCTURE */}
-        <div className="card bg-white shadow-xl mb-6 overflow-hidden">
+        <div className="card bg-white shadow-xl mb-6 overflow-hidden mobile-compact">
           {/* Cover Image - Moved outside card-body for full width */}
           <div className="relative h-64 w-full group bg-gradient-to-r from-blue-400 via-teal-400 to-green-400">
             {tripPlan?.cover_image && (
@@ -548,7 +548,7 @@ export default function TripDetailPage() {
             )}
             <button
               onClick={() => setShowCoverImageModal(true)}
-              className="absolute top-4 right-4 btn btn-sm btn-circle bg-white/80 hover:bg-white border-none shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute top-4 right-4 btn btn-sm btn-circle bg-white/80 hover:bg-white border-none shadow-lg opacity-0 group-hover:opacity-100 transition-opacity tap-target"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -566,10 +566,10 @@ export default function TripDetailPage() {
                 <span className="text-yellow-500 font-semibold">{language === "en" ? "Rated" : "Đã đánh giá"}</span>
               )}
             </div>
-            <h1 className="text-3xl font-bold mb-4">{tripPlan.trip_name}</h1>
+            <h1 className="text-3xl font-bold mb-4 mobile-heading">{tripPlan.trip_name}</h1>
             
             {/* Trip Metadata - Time, Budget, Activity */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div className="flex items-center gap-3 p-3 bg-pink-50 rounded-lg">
                 <svg className="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -603,16 +603,16 @@ export default function TripDetailPage() {
               </div>
             </div>
             
-            <p className="text-gray-600">{tripPlan.overview}</p>
+            <p className="text-gray-600 mobile-text-base">{tripPlan.overview}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="card bg-white shadow-xl sticky top-24">
+          <div className="lg:col-span-1 order-2 lg:order-1">
+            <div className="card bg-white shadow-xl lg:sticky lg:top-24 mobile-compact">
               <div className="card-body p-6">
-                <h2 className="card-title text-xl mb-6 text-center w-full">
+                <h2 className="card-title text-xl mb-6 text-center w-full mobile-heading">
                   {language === "en" ? "Trip Information" : "Thông tin chuyến đi"}
                 </h2>
                 
@@ -679,7 +679,7 @@ export default function TripDetailPage() {
                   <button
                     onClick={handleGeneratePodcast}
                     disabled={podcastGenerating}
-                    className="btn btn-sm btn-outline btn-purple w-full gap-2 mb-2"
+                    className="btn btn-sm btn-outline btn-purple w-full gap-2 mb-2 tap-target"
                   >
                     {podcastGenerating ? (
                       <>
@@ -708,7 +708,7 @@ export default function TripDetailPage() {
                 <div className="space-y-2">
                   <button
                     onClick={() => exportToGoogleCalendar(tripData, tripPlan)}
-                    className="btn btn-primary w-full gap-2 shadow-md hover:shadow-lg transition-all text-sm whitespace-nowrap"
+                    className="btn btn-primary w-full gap-2 shadow-md hover:shadow-lg transition-all text-sm whitespace-nowrap tap-target"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/>
@@ -718,7 +718,7 @@ export default function TripDetailPage() {
                   
                   <button
                     onClick={() => exportToAppleCalendar(tripData, tripPlan)}
-                    className="btn btn-outline btn-primary w-full gap-2 shadow-md hover:shadow-lg transition-all text-sm whitespace-nowrap"
+                    className="btn btn-outline btn-primary w-full gap-2 shadow-md hover:shadow-lg transition-all text-sm whitespace-nowrap tap-target"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
@@ -754,7 +754,7 @@ export default function TripDetailPage() {
                         console.error("Failed to toggle public status:", err);
                       }
                     }}
-                    className={`btn w-full gap-2 shadow-md hover:shadow-lg transition-all text-sm ${
+                    className={`btn w-full gap-2 shadow-md hover:shadow-lg transition-all text-sm tap-target ${
                       tripData.is_public ? "btn-success" : "btn-outline"
                     }`}
                   >
@@ -781,7 +781,7 @@ export default function TripDetailPage() {
                 {/* Weather Forecast */}
                 {tripPlan.weather_forecast && tripPlan.weather_forecast.length > 0 && (
                   <div className="mb-6">
-                    <h3 className="font-bold mb-3 flex items-center gap-2">
+                    <h3 className="font-bold mb-3 flex items-center gap-2 mobile-heading">
                       <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10 2a6 6 0 00-6 6c0 4.314 6 10 6 10s6-5.686 6-10a6 6 0 00-6-6zm0 8a2 2 0 110-4 2 2 0 010 4z"/>
                       </svg>
@@ -811,7 +811,7 @@ export default function TripDetailPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <h3 className="font-bold mb-2 flex items-center gap-2">
+                    <h3 className="font-bold mb-2 flex items-center gap-2 mobile-heading">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                       </svg>
@@ -843,7 +843,7 @@ export default function TripDetailPage() {
                   </div>
 
                   <div>
-                    <h3 className="font-bold mb-2 flex items-center gap-2">
+                    <h3 className="font-bold mb-2 flex items-center gap-2 mobile-heading">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -879,17 +879,17 @@ export default function TripDetailPage() {
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 order-1 lg:order-2">
             {/* Days Timeline */}
             <div className="space-y-6">
               {tripPlan.days?.map((day, dayIndex) => (
-                <div key={dayIndex} className="card bg-white shadow-xl">
+                <div key={dayIndex} className="card bg-white shadow-xl mobile-compact">
                   <div className="card-body">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="badge badge-lg badge-primary px-4 py-3 text-lg font-bold">
                         {language === "en" ? `Day ${day.day}` : `Ngày ${day.day}`}
                       </div>
-                      <h3 className="text-xl font-bold">{day.title}</h3>
+                      <h3 className="text-xl font-bold mobile-heading">{day.title}</h3>
                     </div>
 
                     {/* Route Map for this day */}

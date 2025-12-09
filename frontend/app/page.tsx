@@ -38,10 +38,10 @@ export default function LandingPage() {
         <div className="navbar-start">
           <div className="flex items-center gap-2 ml-4">
             {/* Navigation Links */}
-            <a href="/explore" className="btn btn-ghost btn-sm font-semibold">
+            <a href="/explore" className="btn btn-ghost btn-sm font-semibold tap-target">
               Khám phá
             </a>
-            <a href="/blog" className="btn btn-ghost btn-sm font-semibold">
+            <a href="/blog" className="btn btn-ghost btn-sm font-semibold tap-target">
               Blog
             </a>
           </div>
@@ -58,24 +58,24 @@ export default function LandingPage() {
             <div className="loading loading-spinner loading-sm"></div>
           ) : user && !user.isAnonymous ? (
             <div className="flex items-center gap-4">
-              <a href="/profile" className="btn btn-ghost btn-sm">
+              <a href="/profile" className="btn btn-ghost btn-sm tap-target">
                 {language === "en" ? "Profile" : "Hồ sơ"}
               </a>
-              <a href="/trips" className="btn btn-ghost btn-sm">
+              <a href="/trips" className="btn btn-ghost btn-sm tap-target">
                 {language === "en" ? "My Trips" : "Chuyến đi"}
               </a>
-              <a href="/trip/input" className="btn btn-primary btn-sm">
+              <a href="/trip/input" className="btn btn-primary btn-sm tap-target">
                 {t("home.planTrip.button")}
               </a>
               <button
                 onClick={() => signOut()}
-                className="btn btn-ghost btn-sm"
+                className="btn btn-ghost btn-sm tap-target"
               >
                 {language === "en" ? "Sign Out" : "Đăng xuất"}
               </button>
             </div>
           ) : (
-            <a href="/auth" className="btn btn-primary">
+            <a href="/auth" className="btn btn-primary tap-target">
               {language === "en" ? "Get Started" : "Bắt đầu"}
             </a>
           )}
@@ -83,13 +83,13 @@ export default function LandingPage() {
       </div>
 
       <div className="flex flex-col gap-6 h-screen place-items-center justify-center px-4">
-        <h1 className="text-6xl font-bold w-full text-center">
+        <h1 className="text-4xl md:text-6xl font-bold w-full text-center mobile-heading">
           <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 via-teal-500 to-green-500">
             {t("home.title")}
           </span>
         </h1>
 
-        <h2 className="text-xl w-full text-center text-gray-600 mt-4">
+        <h2 className="text-lg md:text-xl w-full text-center text-gray-600 mt-4 mobile-text-base">
           {t("home.subtitle")}
         </h2>
 
@@ -100,18 +100,18 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <h2 className="text-base w-full text-center mt-6 max-w-2xl text-gray-600">
+        <h2 className="text-base w-full text-center mt-6 max-w-2xl text-gray-600 mobile-text-base px-4">
           {t("home.description")}
         </h2>
 
         <a href="/trip/input" className="mt-8">
-          <button className="btn btn-primary btn-lg rounded-full px-8 text-lg">
+          <button className="btn btn-primary btn-lg rounded-full px-8 text-lg tap-target">
             {t("home.getStarted")}
           </button>
         </a>
 
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl">
-          <div className="card bg-base-100 shadow-md hover:shadow-xl transition-shadow">
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl px-4">
+          <div className="card bg-base-100 shadow-md hover:shadow-xl transition-shadow mobile-compact">
             <div className="card-body items-center text-center">
               <div className="text-4xl mb-2">🗺️</div>
               <h3 className="card-title text-lg">{t("home.feature1.title")}</h3>
@@ -119,7 +119,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="card bg-base-100 shadow-md hover:shadow-xl transition-shadow">
+          <div className="card bg-base-100 shadow-md hover:shadow-xl transition-shadow mobile-compact">
             <div className="card-body items-center text-center">
               <div className="text-4xl mb-2">📍</div>
               <h3 className="card-title text-lg">{t("home.feature2.title")}</h3>
@@ -127,9 +127,9 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="card bg-base-100 shadow-md hover:shadow-xl transition-shadow">
+          <div className="card bg-base-100 shadow-md hover:shadow-xl transition-shadow mobile-compact">
             <div className="card-body items-center text-center">
-              <div className="text-4xl mb-2">✨</div>
+            <div className="text-4xl mb-2">✨</div>
               <h3 className="card-title text-lg">{t("home.feature3.title")}</h3>
               <p className="text-sm text-gray-600">{t("home.feature3.desc")}</p>
             </div>
