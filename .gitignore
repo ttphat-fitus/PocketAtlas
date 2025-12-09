@@ -12,6 +12,8 @@ backend/env/
 .env
 .env.local
 .env.*.local
+# Vercel
+.vercelignore
 
 # JSON config files (except package.json and package-lock.json)
 *.json
