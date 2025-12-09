@@ -278,9 +278,12 @@ export default function TripDetailPage() {
   const [rating, setRating] = useState(0);
   const [ratingUpdating, setRatingUpdating] = useState(false);
   const [showCoverImageModal, setShowCoverImageModal] = useState(false);
+  const [weatherData, setWeatherData] = useState<any>(null);
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [coverImageUpdating, setCoverImageUpdating] = useState(false);
   const [coverImageLoaded, setCoverImageLoaded] = useState(false);
+  const [podcastGenerating, setPodcastGenerating] = useState(false);
+  const [podcastUrl, setPodcastUrl] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -317,6 +320,7 @@ export default function TripDetailPage() {
 
         const data = await response.json();
         console.log("Trip data fetched:", data);
+        console.log("Weather data from API:", data.weather);
         
         // Extract cover image from either location
         const coverImage = data.trip_plan?.cover_image || data.cover_image || "";
@@ -330,6 +334,14 @@ export default function TripDetailPage() {
         setRating(data.rating || 0);
         setCoverImageUrl(coverImage);
         setCoverImageLoaded(false);
+        
+        // Extract weather data if available
+        if (data.weather) {
+          console.log("Setting weather data:", data.weather);
+          setWeatherData(data.weather);
+        } else {
+          console.warn("No weather data available in trip");
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load trip");
       } finally {
@@ -373,6 +385,38 @@ export default function TripDetailPage() {
       console.error("Failed to update rating:", err);
     } finally {
       setRatingUpdating(false);
+    }
+  };
+
+  const handleGeneratePodcast = async () => {
+    if (!user || !tripId) return;
+
+    setPodcastGenerating(true);
+    setPodcastUrl(null);
+
+    try {
+      const token = await getIdToken();
+      const response = await fetch(`http://localhost:8000/api/trip/${tripId}/generate-podcast`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to generate podcast");
+      }
+
+      const data = await response.json();
+      if (data.podcast_url) {
+        setPodcastUrl(data.podcast_url);
+      }
+    } catch (err) {
+      console.error("Error generating podcast:", err);
+      alert(language === "en" ? "Failed to generate podcast. Please try again." : "Không thể tạo podcast. Vui lòng thử lại.");
+    } finally {
+      setPodcastGenerating(false);
     }
   };
 
@@ -467,52 +511,52 @@ export default function TripDetailPage() {
       </div>
 
       <div className="container mx-auto p-6 max-w-7xl">
-        {/* Header with title and metadata */}
-        <div className="card bg-white shadow-xl mb-6">
-          <div className="card-body">
-            {/* Cover Image */}
-            <div className="relative h-64 w-full rounded-xl overflow-hidden mb-6 -mx-8 -mt-8 group bg-gradient-to-r from-blue-400 via-teal-400 to-green-400">
-              {tripPlan?.cover_image && (
-                <>
-                  <img
-                    key={tripPlan.cover_image}
-                    src={tripPlan.cover_image}
-                    alt={tripPlan.trip_name}
-                    className="w-full h-full object-cover transition-opacity duration-500"
-                    onLoad={() => {
-                      console.log("✓ Cover image loaded successfully:", tripPlan.cover_image);
-                      setCoverImageLoaded(true);
-                    }}
-                    onError={(e) => {
-                      console.error("✗ Cover image failed to load:", tripPlan.cover_image, e);
-                      setCoverImageLoaded(false);
-                    }}
-                  />
-                  {coverImageLoaded && (
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                  )}
-                </>
-              )}
-              {!tripPlan?.cover_image && (
-                <div className="w-full h-full flex items-center justify-center">
-                  <svg className="w-16 h-16 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-              )}
-              {!coverImageLoaded && tripPlan?.cover_image && (
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-              )}
-              <button
-                onClick={() => setShowCoverImageModal(true)}
-                className="absolute top-4 right-4 btn btn-sm btn-circle bg-white/80 hover:bg-white border-none shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        {/* Header with title and metadata - UPDATED STRUCTURE */}
+        <div className="card bg-white shadow-xl mb-6 overflow-hidden">
+          {/* Cover Image - Moved outside card-body for full width */}
+          <div className="relative h-64 w-full group bg-gradient-to-r from-blue-400 via-teal-400 to-green-400">
+            {tripPlan?.cover_image && (
+              <>
+                <img
+                  key={tripPlan.cover_image}
+                  src={tripPlan.cover_image}
+                  alt={tripPlan.trip_name}
+                  className="w-full h-full object-cover transition-opacity duration-500"
+                  onLoad={() => {
+                    console.log("✓ Cover image loaded successfully:", tripPlan.cover_image);
+                    setCoverImageLoaded(true);
+                  }}
+                  onError={(e) => {
+                    console.error("✗ Cover image failed to load:", tripPlan.cover_image, e);
+                    setCoverImageLoaded(false);
+                  }}
+                />
+                {coverImageLoaded && (
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                )}
+              </>
+            )}
+            {!tripPlan?.cover_image && (
+              <div className="w-full h-full flex items-center justify-center">
+                <svg className="w-16 h-16 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-              </button>
-            </div>
-            
+              </div>
+            )}
+            {!coverImageLoaded && tripPlan?.cover_image && (
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+            )}
+            <button
+              onClick={() => setShowCoverImageModal(true)}
+              className="absolute top-4 right-4 btn btn-sm btn-circle bg-white/80 hover:bg-white border-none shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+          </div>
+          
+          <div className="card-body pt-4">
             <div className="text-xs text-gray-400 mb-2">
               {language === "en" ? `Created: ${formatDate(tripData.created_at)}` : `Tạo lúc: ${formatDate(tripData.created_at)}`}
               {" • "}
@@ -572,7 +616,7 @@ export default function TripDetailPage() {
                   {language === "en" ? "Trip Information" : "Thông tin chuyến đi"}
                 </h2>
                 
-                {/* Rating Section - Moved to Top */}
+                {/* Rating Section */}
                 <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-4 rounded-lg mb-6">
                   <h3 className="font-bold mb-3 flex items-center justify-center gap-2 text-gray-700">
                     <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
@@ -607,7 +651,7 @@ export default function TripDetailPage() {
                   </div>
                 </div>
 
-                {/* Total Cost - Vertical stacked layout */}
+                {/* Total Cost */}
                 <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-4 mb-6 shadow-sm">
                   <div className="flex items-center gap-2 mb-2">
                     <svg className="w-5 h-5 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -620,7 +664,46 @@ export default function TripDetailPage() {
                   </div>
                 </div>
 
-                {/* Export Button */}
+                {/* Podcast Generation */}
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-4 mb-6 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C9.79 2 8 3.79 8 6c0 1.7 1.01 3.17 2.5 3.82V21h3v-11.18C14.99 9.17 16 7.7 16 6c0-2.21-1.79-4-4-4zm0 6c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
+                      <path d="M7.05 8.62C5.77 9.73 5 11.29 5 13c0 3.86 3.14 7 7 7s7-3.14 7-7c0-1.71-.77-3.27-2.05-4.38l-1.42 1.42C16.44 10.94 17 11.92 17 13c0 2.76-2.24 5-5 5s-5-2.24-5-5c0-1.08.56-2.06 1.47-2.96L7.05 8.62z" opacity="0.5"/>
+                      <path d="M3.34 6.76C1.85 8.59 1 10.94 1 13.5c0 6.08 4.92 11 11 11s11-4.92 11-11c0-2.56-.85-4.91-2.34-6.74l-1.42 1.42C20.33 9.89 21 11.62 21 13.5c0 4.97-4.03 9-9 9s-9-4.03-9-9c0-1.88.67-3.61 1.76-5.32L3.34 6.76z" opacity="0.3"/>
+                    </svg>
+                    <span className="text-sm text-purple-600 font-semibold">
+                      {language === "en" ? "Travel Podcast" : "Podcast du lịch"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleGeneratePodcast}
+                    disabled={podcastGenerating}
+                    className="btn btn-sm btn-outline btn-purple w-full gap-2 mb-2"
+                  >
+                    {podcastGenerating ? (
+                      <>
+                        <span className="loading loading-spinner loading-xs"></span>
+                        {language === "en" ? "Generating..." : "Đang tạo..."}
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        {language === "en" ? "Generate" : "Tạo podcast"}
+                      </>
+                    )}
+                  </button>
+                  {podcastUrl && (
+                    <div className="mt-2">
+                      <audio controls className="w-full">
+                        <source src={podcastUrl} type="audio/mpeg" />
+                      </audio>
+                    </div>
+                  )}
+                </div>
+
                 {/* Export Buttons */}
                 <div className="space-y-2">
                   <button
@@ -695,7 +778,7 @@ export default function TripDetailPage() {
 
                 <div className="divider my-6"></div>
 
-                {/* Weather Forecast Section */}
+                {/* Weather Forecast */}
                 {tripPlan.weather_forecast && tripPlan.weather_forecast.length > 0 && (
                   <div className="mb-6">
                     <h3 className="font-bold mb-3 flex items-center gap-2">
@@ -739,7 +822,6 @@ export default function TripDetailPage() {
                       if (!packingList) {
                         return <p className="text-sm text-gray-500 italic">Chưa có danh sách đồ dùng</p>;
                       }
-                      // Handle if it's a string (parse it)
                       const items = Array.isArray(packingList) ? packingList : [];
                       const validItems = items.filter(item => typeof item === 'string' && item.trim());
                       
@@ -772,7 +854,6 @@ export default function TripDetailPage() {
                       if (!travelTips) {
                         return <p className="text-sm text-gray-500 italic">Chưa có mẹo du lịch</p>;
                       }
-                      // Handle if it's a string (parse it)
                       const tips = Array.isArray(travelTips) ? travelTips : [];
                       const validTips = tips.filter(tip => typeof tip === 'string' && tip.trim());
                       

@@ -51,8 +51,9 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         json_str = match.group(1) or match.group(2)
         trip_plan = json.loads(json_str)
         
-        # Get destination weather forecast
+        # Get destination weather forecast with score and warning level
         destination_weather = []
+        weather_info = {}
         forecasts = []
         try:
             from datetime import timedelta
@@ -60,19 +61,22 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
             today = datetime.now()
             days_until_trip = (start_date - today).days
             
-            if 0 <= days_until_trip <= 14:
+            if 0 <= days_until_trip <= 3:  # Only fetch weather for trips within 3 days
                 location_coords = await async_geocode(trip_request.destination)
                 
                 if location_coords.get("lat"):
                     weather_data = await get_weather_forecast_async(
                         location_coords["lat"], 
                         location_coords["lng"], 
-                        trip_request.duration
+                        trip_request.duration  # Get weather for full trip duration
                     )
                     forecasts = weather_data.get("forecasts", [])
+                    weather_info = {
+                        "forecasts": forecasts
+                    }
                     print(f"[OK] Weather API returned {len(forecasts)} days of forecast")
             else:
-                print(f"[WARN] Trip starts in {days_until_trip} days - beyond weather forecast range")
+                print(f"[WARN] Trip starts in {days_until_trip} days - beyond 3-day weather forecast range")
             
             if forecasts:
                 for i in range(min(trip_request.duration, len(forecasts))):
@@ -81,13 +85,14 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
                         fc = forecasts[i]
                         destination_weather.append({
                             "day": i + 1,
-                            "date": trip_date,
-                            "condition": fc.get("condition", "Clear"),
+                            "date": fc.get("date", trip_date),
                             "temp_max": fc.get("temp_max", 0),
                             "temp_min": fc.get("temp_min", 0),
+                            "condition": fc.get("condition", ""),
                             "rain_chance": fc.get("rain_chance", 0),
                             "humidity": fc.get("humidity", 0),
-                            "suggestion": fc.get("suggestion", "")
+                            "is_rainy": fc.get("is_rainy", False),
+                            "is_sunny": fc.get("is_sunny", False)
                         })
                 
                 print(f"[OK] Weather forecast added for {len(destination_weather)} days")
@@ -129,6 +134,7 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
                 "active_time_start": trip_request.active_time_start,
                 "active_time_end": trip_request.active_time_end,
                 "trip_plan": trip_plan,
+                "weather": weather_info,
                 "created_at": datetime.now().isoformat(),
                 "rating": 0,
                 "is_public": False,

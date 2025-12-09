@@ -31,6 +31,27 @@ const formatDate = (dateString: string): string => {
   return `${day}/${month}/${year}`;
 };
 
+// Format price display - always show "Miễn phí" for free items
+const formatPrice = (price: string | undefined): string => {
+  if (!price) return 'Miễn phí';
+  
+  const normalizedPrice = price.trim().toLowerCase();
+  
+  // Check for free indicators
+  if (normalizedPrice === '0' || 
+      normalizedPrice === '0đ' || 
+      normalizedPrice === '0 đ' || 
+      normalizedPrice === '0vnd' ||
+      normalizedPrice === '0 vnd' ||
+      normalizedPrice === 'free' ||
+      normalizedPrice === 'miễn phí') {
+    return 'Miễn phí';
+  }
+  
+  // Replace VND with ₫ symbol
+  return price.replace(/VND/gi, '₫').replace(/đ/g, '₫');
+};
+
 interface PlaceDetails {
   name: string;
   address: string;
@@ -257,7 +278,7 @@ function SortableActivity({
                   />
                 ) : (
                   <div className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full whitespace-nowrap">
-                    {activity.estimated_cost?.replace(/VND/g, '₫').replace(/đ/g, '₫') || 'Miễn phí'}
+                    {formatPrice(activity.estimated_cost)}
                   </div>
                 )}
 
@@ -591,7 +612,7 @@ export default function TripPlanPage() {
                 <div className="min-w-0">
                   <div className="text-[10px] text-blue-600 font-semibold">{language === "en" ? "Total Cost" : "Tổng chi phí"}</div>
                   <div className="font-bold text-gray-800 text-sm truncate">
-                    {tripPlan.total_estimated_cost?.replace(/VND/g, '₫').replace(/đ/g, '₫') || '0 ₫'}
+                    {formatPrice(tripPlan.total_estimated_cost)}
                   </div>
                 </div>
               </div>

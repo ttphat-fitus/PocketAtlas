@@ -18,6 +18,7 @@ def get_weather_forecast(lat: float, lng: float, days: int = 10) -> dict:
             "alerts": "no"
         }
         
+        print(f"[INFO] Fetching weather for coordinates: {lat}, {lng}")
         resp = requests.get(url, params=params, timeout=10)
         data = resp.json()
         
@@ -67,6 +68,7 @@ async def get_weather_forecast_async(lat: float, lng: float, days: int = 10) -> 
             "alerts": "no"
         }
         
+        print(f"[INFO] Fetching weather (async) for coordinates: {lat}, {lng}")
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.get(url, params=params)
             data = resp.json()
