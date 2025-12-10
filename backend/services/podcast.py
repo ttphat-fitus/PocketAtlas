@@ -16,11 +16,27 @@ class PodcastService:
     def __init__(self):
         """Initialize TTS client with speech credentials"""
         try:
-            # Load speech credentials
-            speech_key_path = os.path.join(os.path.dirname(__file__), "..", "key", "speech_key.json")
-            credentials = service_account.Credentials.from_service_account_file(speech_key_path)
-            self.tts_client = texttospeech.TextToSpeechClient(credentials=credentials)
-            print("[OK] TTS client initialized successfully")
+            # Load speech credentials from env or local file
+            speech_key_path = os.getenv("SPEECH_KEY_PATH")
+            
+            if not speech_key_path:
+                # Try multiple fallback paths
+                possible_paths = [
+                    "/etc/secret_files/speech_key.json",
+                    os.path.join(os.path.dirname(__file__), "..", "key", "speech_key.json")
+                ]
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        speech_key_path = path
+                        break
+            
+            if speech_key_path and os.path.exists(speech_key_path):
+                credentials = service_account.Credentials.from_service_account_file(speech_key_path)
+                self.tts_client = texttospeech.TextToSpeechClient(credentials=credentials)
+                print("[OK] TTS client initialized successfully")
+            else:
+                print("[WARN] Speech key not found. TTS features disabled.")
+                self.tts_client = None
         except Exception as e:
             print(f"[WARN] Could not initialize TTS client: {e}")
             self.tts_client = None
