@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { getIdToken } from "../../lib/firebase";
+import { getApiUrl } from "../../lib/api";
 
 // Badge icon SVG mapper with emoji fallback (EXCEPTION CASE for badges only)
 const BadgeIcon = ({ icon, className = "w-8 h-8", showEmojiFallback = false }: { icon: string; className?: string; showEmojiFallback?: boolean }) => {
@@ -177,7 +178,7 @@ export default function ProfilePage() {
     if (!user) return;
     
     try {
-      const response = await fetch(`http://localhost:8000/api/user/${user.uid}/stats`);
+      const response = await fetch(getApiUrl(`/api/user/${user.uid}/stats`));
       if (response.ok) {
         const data = await response.json();
         setBadges(data.badges || []);
@@ -194,7 +195,7 @@ export default function ProfilePage() {
     if (!user) return;
     
     try {
-      const response = await fetch(`http://localhost:8000/api/user/${user.uid}/rewards`);
+      const response = await fetch(getApiUrl(`/api/user/${user.uid}/rewards`));
       if (response.ok) {
         const data = await response.json();
         setRewards(data.available_rewards || []);
@@ -211,7 +212,7 @@ export default function ProfilePage() {
     
     try {
       const token = await getIdToken();
-      const response = await fetch(`http://localhost:8000/api/user/redeem-reward`, {
+      const response = await fetch(getApiUrl("/api/user/redeem-reward"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -237,7 +238,7 @@ export default function ProfilePage() {
     
     try {
       const token = await getIdToken();
-      const response = await fetch(`http://localhost:8000/api/user/profile`, {
+      const response = await fetch(getApiUrl("/api/user/profile"), {
         headers: {
           Authorization: `Bearer ${token}`,
         },

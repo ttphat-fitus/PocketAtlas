@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useLanguage } from "../../../../contexts/LanguageContext";
 import { useAuth } from "../../../../contexts/AuthContext";
 import RouteMap from "../../../../components/RouteMap";
+import { getApiUrl } from "../../../../lib/api";
 
 interface PlaceDetails {
   name: string;
@@ -82,7 +83,7 @@ export default function ExploreDetailPage() {
         
         // Fetch public trip data
         const response = await fetch(
-          `http://localhost:8000/api/catalog/trips?page=1&limit=100`
+          getApiUrl("/api/catalog/trips?page=1&limit=100")
         );
 
         if (!response.ok) {
@@ -98,7 +99,7 @@ export default function ExploreDetailPage() {
 
         // Fetch full trip details using public endpoint
         const detailResponse = await fetch(
-          `http://localhost:8000/api/public-trip/${tripId}`
+          getApiUrl(`/api/public-trip/${tripId}`)
         );
 
         if (detailResponse.ok) {
@@ -112,7 +113,7 @@ export default function ExploreDetailPage() {
         }
 
         // Increment view count
-        await fetch(`http://localhost:8000/api/trip/${tripId}/view`, {
+        await fetch(getApiUrl(`/api/trip/${tripId}/view`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_id: userId || "anonymous" }),
@@ -121,7 +122,7 @@ export default function ExploreDetailPage() {
         // Check if current user has liked this trip
         if (user?.uid) {
           const likeCheckResponse = await fetch(
-            `http://localhost:8000/api/trip/${tripId}/like-status?user_id=${user.uid}`
+            getApiUrl(`/api/trip/${tripId}/like-status?user_id=${user.uid}`)
           );
           if (likeCheckResponse.ok) {
             const likeData = await likeCheckResponse.json();
@@ -144,7 +145,7 @@ export default function ExploreDetailPage() {
     const currentUserId = user?.uid || "anonymous";
 
     try {
-      const response = await fetch(`http://localhost:8000/api/trip/${tripId}/like`, {
+      const response = await fetch(getApiUrl(`/api/trip/${tripId}/like`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: currentUserId }),

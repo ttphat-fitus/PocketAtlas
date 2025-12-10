@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "../../contexts/LanguageContext";
 import TripCard from "../../components/TripCard";
+import { getApiUrl } from "../../lib/api";
 
 interface PublicTrip {
   trip_id: string;
@@ -75,7 +76,7 @@ export default function ExplorePage() {
       if (searchQuery) params.append("search", searchQuery);
 
       const response = await fetch(
-        `http://localhost:8000/api/catalog/trips?${params}`
+        getApiUrl(`/api/catalog/trips?${params}`)
       );
 
       if (!response.ok) {
@@ -142,7 +143,7 @@ export default function ExplorePage() {
   const handleViewTrip = async (tripId: string) => {
     // Increment view count
     try {
-      await fetch(`http://localhost:8000/api/trip/${tripId}/view`, {
+      await fetch(getApiUrl(`/api/trip/${tripId}/view`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: "anonymous" }),

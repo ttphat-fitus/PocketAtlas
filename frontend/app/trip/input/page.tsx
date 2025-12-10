@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useAuth } from "../../../contexts/AuthContext";
 import LoadingScreen from "../../../components/LoadingScreen";
+import { getApiUrl } from "../../../lib/api";
 
 export default function TripInputPage() {
   const router = useRouter();
@@ -77,7 +78,7 @@ export default function TripInputPage() {
       }
 
       setLoadingProgress(30);
-      const response = await fetch("http://localhost:8000/api/plan-trip", {
+      const response = await fetch(getApiUrl("/api/plan-trip"), {
         method: "POST",
         headers,
         body: JSON.stringify(formData),

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { blogPosts } from "../../lib/blogData";
+import { getApiUrl } from "../../lib/api";
 
 interface BlogPost {
   id: string;
@@ -35,7 +36,7 @@ export default function BlogPage() {
   useEffect(() => {
     const fetchBlogs = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/blogs");
+        const response = await fetch(getApiUrl("/api/blogs"));
         if (response.ok) {
           const data = await response.json();
           setUserBlogs(data.blogs || []);

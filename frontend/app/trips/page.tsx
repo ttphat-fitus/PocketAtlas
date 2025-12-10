@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import StarRating from "../../components/StarRating";
+import { getApiUrl } from "../../lib/api";
 
 interface TripSummary {
   trip_id: string;
@@ -117,7 +118,7 @@ export default function MyTripsPage() {
         throw new Error("Not authenticated");
       }
 
-      const response = await fetch("http://localhost:8000/api/my-trips", {
+      const response = await fetch(getApiUrl("/api/my-trips"), {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -143,7 +144,7 @@ export default function MyTripsPage() {
 
     try {
       const token = await getIdToken();
-      const response = await fetch(`http://localhost:8000/api/trip/${tripId}`, {
+      const response = await fetch(getApiUrl(`/api/trip/${tripId}`), {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../contexts/AuthContext";
+import { getApiUrl } from "../../../lib/api";
 
 interface BlogFormData {
   title: string;
@@ -65,7 +66,7 @@ export default function CreateBlogPage() {
       
       try {
         const token = await getIdToken();
-        const response = await fetch("http://localhost:8000/api/my-trips", {
+        const response = await fetch(getApiUrl("/api/my-trips"), {
           headers: { Authorization: `Bearer ${token}` },
         });
         
@@ -108,7 +109,7 @@ export default function CreateBlogPage() {
     
     try {
       const token = await getIdToken();
-      const response = await fetch(`http://localhost:8000/api/blog/generate-from-trip`, {
+      const response = await fetch(getApiUrl("/api/blog/generate-from-trip"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -153,7 +154,7 @@ export default function CreateBlogPage() {
     
     try {
       const token = await getIdToken();
-      const response = await fetch("http://localhost:8000/api/blog/create", {
+      const response = await fetch(getApiUrl("/api/blog/create"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

@@ -13,8 +13,19 @@ _firebase_auth = None
 _firebase_db = None
 _initialized = False
 
-def _get_firebase_key_path():
-    """Find Firebase key path from multiple sources"""
+def _get_firebase_credentials():
+    """Get Firebase credentials from environment variable or file"""
+    # Try to load from FIREBASE_CREDENTIALS env var (JSON string)
+    firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS")
+    if firebase_creds_json:
+        try:
+            creds_dict = json.loads(firebase_creds_json)
+            print("✓ Firebase credentials loaded from FIREBASE_CREDENTIALS env var")
+            return credentials.Certificate(creds_dict)
+        except json.JSONDecodeError as e:
+            print(f"✗ Error parsing FIREBASE_CREDENTIALS: {e}")
+    
+    # Try to load from file path
     firebase_key_path = os.getenv("FIREBASE_KEY_PATH")
     
     possible_paths = [
@@ -27,7 +38,7 @@ def _get_firebase_key_path():
     for path in possible_paths:
         if path and os.path.exists(path):
             print(f"✓ Firebase key found at: {path}")
-            return path
+            return credentials.Certificate(path)
     
     return None
 
@@ -38,16 +49,15 @@ def _initialize_firebase():
     if _initialized:
         return
     
-    firebase_key_path = _get_firebase_key_path()
+    cred = _get_firebase_credentials()
     
-    if not firebase_key_path:
+    if not cred:
         print("⚠ Firebase key not found. Some features may not work.")
-        print("  Set FIREBASE_KEY_PATH env var or use Render Secret Files.")
+        print("  Set FIREBASE_CREDENTIALS or FIREBASE_KEY_PATH env var.")
         _initialized = True
         return
     
     try:
-        cred = credentials.Certificate(firebase_key_path)
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred)
         print("✓ Firebase initialized successfully")
