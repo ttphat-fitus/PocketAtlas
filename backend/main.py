@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
@@ -11,6 +11,7 @@ from routers.trips import router as trips_router
 from routers.profile import router as profile_router
 from routers.blog import router as blog_router
 from routers.catalog import router as catalog_router
+from firebase import get_current_user
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -59,7 +60,24 @@ async def root():
         "version": "2.0.0",
         "status": "running",
         "docs": "/docs",
-        "environment": ENVIRONMENT
+        "environment": ENVIRONMENT,
+        "cors_origins": allowed_origins
+    }
+
+
+@app.options("/{full_path:path}")
+async def preflight_handler(full_path: str):
+    """Handle CORS preflight requests"""
+    return {}
+
+
+@app.get("/api/test-auth")
+async def test_auth(user = Depends(get_current_user)):
+    """Test endpoint to verify authentication"""
+    return {
+        "status": "authenticated",
+        "user_id": user["uid"],
+        "email": user["email"],
     }
 
 

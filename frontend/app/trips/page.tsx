@@ -113,24 +113,41 @@ export default function MyTripsPage() {
 
   const fetchTrips = async () => {
     try {
+      console.log("Starting to fetch trips...");
+      console.log("User:", user?.uid);
+      console.log("Auth loading:", authLoading);
+
       const token = await getIdToken();
+      console.log("Got token:", token ? token.substring(0, 20) + "..." : "null");
+      
       if (!token) {
-        throw new Error("Not authenticated");
+        throw new Error("No authentication token available. Please log in again.");
       }
 
-      const response = await fetch(getApiUrl("/api/my-trips"), {
+      const apiUrl = getApiUrl("/api/my-trips");
+      console.log("Fetching from:", apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: "GET",
         headers: {
-          Authorization: `Bearer ${token}`,
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       });
 
+      console.log("Response status:", response.status);
+
       if (!response.ok) {
-        throw new Error("Failed to fetch trips");
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        throw new Error(`Failed to fetch trips (${response.status}): ${errorText}`);
       }
 
       const data = await response.json();
+      console.log("Trips data:", data);
       setTrips(data.trips || []);
     } catch (err) {
+      console.error("Full error:", err);
       setError(err instanceof Error ? err.message : "Failed to load trips");
     } finally {
       setLoading(false);

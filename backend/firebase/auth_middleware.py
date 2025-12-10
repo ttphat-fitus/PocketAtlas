@@ -4,17 +4,24 @@ from .firebase_config import get_auth
 
 async def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization:
+        print("[AUTH] Missing Authorization header")
         raise HTTPException(status_code=401, detail="Missing Authorization header")
     
     parts = authorization.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
+        print(f"[AUTH] Invalid Authorization format: {parts}")
         raise HTTPException(status_code=401, detail="Invalid Authorization header format")
     
     token = parts[1]
     
     try:
         firebase_auth = get_auth()
+        if not firebase_auth:
+            print("[AUTH] Firebase auth not initialized")
+            raise HTTPException(status_code=500, detail="Firebase not initialized")
+        
         decoded_token = firebase_auth.verify_id_token(token)
+        print(f"[AUTH] Token verified for user: {decoded_token.get('uid')}")
         return {
             "uid": decoded_token.get("uid"),
             "email": decoded_token.get("email"),
@@ -23,6 +30,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
             "is_anonymous": decoded_token.get("firebase", {}).get("sign_in_provider") == "anonymous",
         }
     except Exception as e:
+        print(f"[AUTH] Token verification failed: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 

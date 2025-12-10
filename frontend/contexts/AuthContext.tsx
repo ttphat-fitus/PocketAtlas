@@ -120,8 +120,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const getIdToken = async () => {
-    if (!isConfigured || !user) return null;
-    return await user.getIdToken();
+    if (!isConfigured || !user) {
+      console.log("Cannot get token - isConfigured:", isConfigured, "user:", !!user);
+      return null;
+    }
+    try {
+      const token = await user.getIdToken(true); // Force refresh
+      console.log("Got ID token:", token.substring(0, 20) + "...");
+      return token;
+    } catch (error) {
+      console.error("Error getting ID token:", error);
+      return null;
+    }
   };
 
   return (
