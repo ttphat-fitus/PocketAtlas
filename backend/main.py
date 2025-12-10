@@ -1,5 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Import routers
 from routers.trips import router as trips_router
@@ -14,10 +19,31 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# CORS configuration - Allow both local and production URLs
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+# Define allowed origins based on environment
+allowed_origins = [
+    "http://localhost:3000",  # Local development
+    "http://localhost:3001",  # Alternative local port
+    "http://127.0.0.1:3000",  # Local IP
+]
+
+# Add production URLs if configured
+if ENVIRONMENT == "production" and FRONTEND_URL != "http://localhost:3000":
+    allowed_origins.append(FRONTEND_URL)
+
+# Add Vercel deployment URLs (wildcard for all Vercel previews and production)
+allowed_origins.extend([
+    "https://pocketatlas.vercel.app",
+    "https://*.vercel.app",
+])
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,16 +63,18 @@ async def root():
         "message": "Pocket Atlas API",
         "version": "2.0.0",
         "status": "running",
-        "docs": "/docs"
+        "docs": "/docs",
+        "environment": ENVIRONMENT
     }
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy"}
+    return {"status": "healthy", "environment": ENVIRONMENT}
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
