@@ -72,7 +72,12 @@ def get_auth():
     global _firebase_auth
     _initialize_firebase()
     if not _firebase_auth:
-        _firebase_auth = auth
+        try:
+            _firebase_auth = auth
+            return _firebase_auth
+        except Exception as e:
+            print(f"✗ Error getting Firebase auth: {e}")
+            return None
     return _firebase_auth
 
 def get_db():

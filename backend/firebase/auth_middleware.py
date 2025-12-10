@@ -16,12 +16,17 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     
     try:
         firebase_auth = get_auth()
-        if not firebase_auth:
-            print("[AUTH] Firebase auth not initialized")
-            raise HTTPException(status_code=500, detail="Firebase not initialized")
         
+        if firebase_auth is None:
+            print("[AUTH] Firebase auth not initialized - credentials may be missing")
+            raise HTTPException(
+                status_code=500, 
+                detail="Firebase authentication not configured. Please contact administrator."
+            )
+        
+        print(f"[AUTH] Attempting to verify token...")
         decoded_token = firebase_auth.verify_id_token(token)
-        print(f"[AUTH] Token verified for user: {decoded_token.get('uid')}")
+        print(f"[AUTH] ✓ Token verified for user: {decoded_token.get('uid')}")
         return {
             "uid": decoded_token.get("uid"),
             "email": decoded_token.get("email"),
@@ -30,7 +35,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
             "is_anonymous": decoded_token.get("firebase", {}).get("sign_in_provider") == "anonymous",
         }
     except Exception as e:
-        print(f"[AUTH] Token verification failed: {str(e)}")
+        print(f"[AUTH] ✗ Token verification failed: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 
