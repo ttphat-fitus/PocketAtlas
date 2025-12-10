@@ -53,6 +53,7 @@ interface TripData {
   category_tags: string[];
   username?: string;
   activity_level?: string;
+  cover_image?: string;
 }
 
 export default function ExploreDetailPage() {

@@ -388,7 +388,7 @@ export default function MyTripsPage() {
                       </div>
                       
                       <h3 className="text-xl font-bold mb-4">{trip.trip_name || trip.destination}</h3>
-                      {trip.rating > 0 && (
+                      {trip.rating && trip.rating > 0 && (
                         <div className="flex items-center gap-2 mb-4">
                           <StarRating rating={trip.rating} readonly size="sm" />
                           <span className="text-xs text-gray-500">

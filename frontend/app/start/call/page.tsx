@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 
-const CallPage: React.FC = () => {
+function CallPageContent() {
   const searchParams = useSearchParams();
   const selectedOption = searchParams.get("selectedOption") || "";
   const [llmResponse, setLLMResponse] = useState<string>("");
@@ -159,6 +159,14 @@ const CallPage: React.FC = () => {
       <h1>Technical</h1>
       <p>{technicalQuestions.join("\n")}</p> */}
     </div>
+  );
+}
+
+const CallPage: React.FC = () => {
+  return (
+    <Suspense fallback={<div className="max-w-2xl mx-auto p-6">Loading...</div>}>
+      <CallPageContent />
+    </Suspense>
   );
 };
 

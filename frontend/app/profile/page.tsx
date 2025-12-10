@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { ReactElement } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -20,7 +21,7 @@ const BadgeIcon = ({ icon, className = "w-8 h-8", showEmojiFallback = false }: {
     pen: "✍️"
   };
   
-  const icons: { [key: string]: JSX.Element } = {
+  const icons: { [key: string]: ReactElement } = {
     compass: (
       <svg className={className} fill="currentColor" viewBox="0 0 20 20">
         <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
@@ -566,7 +567,7 @@ export default function ProfilePage() {
                       <div className="grid grid-cols-3 gap-4 mt-3">
                         <div className="text-center p-3 bg-blue-50 rounded-lg">
                           <div className="text-2xl font-bold text-blue-600">
-                            {userStats?.trips_count ?? profile?.total_trips ?? 0}
+                            {userStats?.trips_count ?? profile?.stats?.total_trips ?? 0}
                           </div>
                           <div className="text-xs text-gray-600 mt-1">
                             {language === "en" ? "Trips" : "Chuyến đi"}
@@ -574,7 +575,7 @@ export default function ProfilePage() {
                         </div>
                         <div className="text-center p-3 bg-green-50 rounded-lg">
                           <div className="text-2xl font-bold text-green-600">
-                            {userStats?.public_trips ?? profile?.public_trips ?? 0}
+                            {userStats?.public_trips ?? profile?.stats?.public_trips ?? 0}
                           </div>
                           <div className="text-xs text-gray-600 mt-1">
                             {language === "en" ? "Public" : "Công khai"}
@@ -582,7 +583,7 @@ export default function ProfilePage() {
                         </div>
                         <div className="text-center p-3 bg-pink-50 rounded-lg">
                           <div className="text-2xl font-bold text-pink-600">
-                            {userStats?.total_likes ?? profile?.liked_trips ?? 0}
+                            {userStats?.total_likes ?? profile?.stats?.total_likes ?? 0}
                           </div>
                           <div className="text-xs text-gray-600 mt-1">
                             {language === "en" ? "Likes" : "Yêu thích"}
