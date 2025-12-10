@@ -1,6 +1,6 @@
 from fastapi import Header, HTTPException, Depends
 from typing import Optional
-from firebase_admin import auth as firebase_auth
+from .firebase_config import get_auth
 
 async def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization:
@@ -13,6 +13,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     token = parts[1]
     
     try:
+        firebase_auth = get_auth()
         decoded_token = firebase_auth.verify_id_token(token)
         return {
             "uid": decoded_token.get("uid"),
