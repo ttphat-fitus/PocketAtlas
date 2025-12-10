@@ -28,17 +28,12 @@ allowed_origins = [
     "http://localhost:3000",  # Local development
     "http://localhost:3001",  # Alternative local port
     "http://127.0.0.1:3000",  # Local IP
+    "https://pocketatlas.vercel.app",  # Main Vercel production
 ]
 
 # Add production URLs if configured
 if ENVIRONMENT == "production" and FRONTEND_URL != "http://localhost:3000":
     allowed_origins.append(FRONTEND_URL)
-
-# Add Vercel deployment URLs (wildcard for all Vercel previews and production)
-allowed_origins.extend([
-    "https://pocketatlas.vercel.app",
-    "https://*.vercel.app",
-])
 
 # CORS middleware
 app.add_middleware(
