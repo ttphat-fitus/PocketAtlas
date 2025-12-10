@@ -379,7 +379,7 @@ export default function MyTripsPage() {
                     <div className="card-body p-6">
                       <div className="text-xs text-gray-400 mb-3">
                         {language === "en" ? `Created: ${formatDate(trip.created_at)}` : `Tạo lúc: ${formatDate(trip.created_at)}`}
-                        {(!trip.rating || trip.rating === 0) && (
+                        {!trip.rating && (
                           <>
                             {" • "}
                             {language === "en" ? "Not yet rated" : "Chưa đánh giá"}
@@ -387,10 +387,14 @@ export default function MyTripsPage() {
                         )}
                       </div>
                       
-                      <h3 className="text-xl font-bold mb-4">{trip.trip_name || trip.destination}</h3>
-                      {trip.rating && trip.rating > 0 && (
+                      {(trip.trip_name && trip.trip_name.trim() !== "") ? (
+                        <h3 className="text-xl font-bold mb-4">{trip.trip_name}</h3>
+                      ) : (
+                        <h3 className="text-xl font-bold mb-4">{trip.destination || "Unknown"}</h3>
+                      )}
+                      {trip.rating && (
                         <div className="flex items-center gap-2 mb-4">
-                          <StarRating rating={trip.rating} readonly size="sm" />
+                          <StarRating rating={Number(trip.rating)} readonly size="sm" />
                           <span className="text-xs text-gray-500">
                             {language === "en" ? "Your rating" : "Đánh giá của bạn"}
                           </span>

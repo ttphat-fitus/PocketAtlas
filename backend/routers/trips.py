@@ -176,18 +176,26 @@ async def get_my_trips(user = Depends(get_current_user)):
         trips_list = []
         for trip in trips:
             trip_data = trip.to_dict()
-            trips_list.append({
+            trip_dict = {
                 "trip_id": trip.id,
+                "trip_name": trip_data.get("trip_name", ""),
                 "destination": trip_data.get("destination"),
                 "duration": trip_data.get("duration"),
                 "budget": trip_data.get("budget"),
                 "start_date": trip_data.get("start_date"),
                 "trip_plan": trip_data.get("trip_plan", {}),
                 "created_at": trip_data.get("created_at"),
-                "rating": trip_data.get("rating", 0),
                 "is_public": trip_data.get("is_public", False),
                 "cover_image": trip_data.get("cover_image", ""),
-            })
+                "activity_level": trip_data.get("activity_level", ""),
+            }
+            
+            # Only include rating if it exists and is greater than 0
+            rating_value = trip_data.get("rating")
+            if rating_value and rating_value > 0:
+                trip_dict["rating"] = rating_value
+            
+            trips_list.append(trip_dict)
         
         # Sort by created_at in Python (descending)
         trips_list.sort(key=lambda x: x.get("created_at", ""), reverse=True)
