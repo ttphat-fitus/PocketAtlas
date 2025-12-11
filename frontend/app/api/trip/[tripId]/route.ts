@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+// Server-side can access NEXT_PUBLIC_ vars, but also check non-public version
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8000';
 
 export async function GET(
   request: NextRequest,
@@ -10,6 +11,11 @@ export async function GET(
     const { tripId } = await params;
     const authHeader = request.headers.get('authorization');
     
+    console.log('[API Route] GET /api/trip/[tripId]');
+    console.log('Backend URL:', BACKEND_URL);
+    console.log('Trip ID:', tripId);
+    console.log('Has Auth:', !!authHeader);
+    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -17,14 +23,19 @@ export async function GET(
       headers['Authorization'] = authHeader;
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/trip/${tripId}`, {
+    const backendEndpoint = `${BACKEND_URL}/api/trip/${tripId}`;
+    console.log('Fetching from:', backendEndpoint);
+    
+    const response = await fetch(backendEndpoint, {
       headers,
       cache: 'no-store',
     });
 
+    console.log('Backend response status:', response.status);
+    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Backend error ${response.status}:`, errorText);
+      console.error('Backend error:', response.status, errorText);
       return NextResponse.json(
         { error: errorText || 'Failed to fetch trip' },
         { 
@@ -39,6 +50,7 @@ export async function GET(
     }
 
     const data = await response.json();
+    console.log('Successfully fetched trip data');
     
     return NextResponse.json(data, { 
       status: response.status,
@@ -49,8 +61,13 @@ export async function GET(
       }
     });
   } catch (error) {
-    console.error('Error fetching trip:', error);
-    return NextResponse.json({ error: 'Failed to fetch trip' }, { status: 500 });
+    console.error('Critical error in API route:', error);
+    console.error('Stack:', error instanceof Error ? error.stack : 'No stack trace');
+    return NextResponse.json({ 
+      error: 'Failed to fetch trip', 
+      details: error instanceof Error ? error.message : String(error),
+      backend_url: BACKEND_URL 
+    }, { status: 500 });
   }
 }
 
