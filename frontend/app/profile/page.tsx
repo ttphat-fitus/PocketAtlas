@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { getIdToken } from "../../lib/firebase";
-import { getApiUrl } from "../../lib/api";
 
 // Badge icon SVG mapper with emoji fallback (EXCEPTION CASE for badges only)
 const BadgeIcon = ({ icon, className = "w-8 h-8", showEmojiFallback = false }: { icon: string; className?: string; showEmojiFallback?: boolean }) => {

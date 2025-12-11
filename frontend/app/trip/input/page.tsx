@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useAuth } from "../../../contexts/AuthContext";
 import LoadingScreen from "../../../components/LoadingScreen";
-import { getApiUrl } from "../../../lib/api";
 
 export default function TripInputPage() {
   const router = useRouter();

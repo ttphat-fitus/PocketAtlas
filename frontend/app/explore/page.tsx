@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "../../contexts/LanguageContext";
 import TripCard from "../../components/TripCard";
-import { getApiUrl } from "../../lib/api";
 
 interface PublicTrip {
   trip_id: string;
@@ -75,9 +74,7 @@ export default function ExplorePage() {
         params.append("category_tags", selectedCategories.join(","));
       if (searchQuery) params.append("search", searchQuery);
 
-      const response = await fetch(
-        getApiUrl(`/api/catalog/trips?${params}`)
-      );
+      const response = await fetch(`/api/explore?${params}`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch trips");

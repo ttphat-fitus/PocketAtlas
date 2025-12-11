@@ -5,7 +5,6 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useLanguage } from "../../../../contexts/LanguageContext";
 import { useAuth } from "../../../../contexts/AuthContext";
 import RouteMap from "../../../../components/RouteMap";
-import { getApiUrl } from "../../../../lib/api";
 
 interface PlaceDetails {
   name: string;

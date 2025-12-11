@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { blogPosts } from "../../lib/blogData";
-import { getApiUrl } from "../../lib/api";
 
 interface BlogPost {
   id: string;

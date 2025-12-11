@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import StarRating from "../../components/StarRating";
-import { getApiUrl } from "../../lib/api";
 
 interface TripSummary {
   trip_id: string;
