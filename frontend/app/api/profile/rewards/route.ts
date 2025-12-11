@@ -10,29 +10,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No authorization header' }, { status: 401 });
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/user/profile`, {
+    // Get profile to extract userId
+    const profileResponse = await fetch(`${BACKEND_URL}/api/user/profile`, {
       headers: {
         'Authorization': authHeader,
       },
     });
 
-    const data = await response.json();
-    
-    const userId = data.uid || data.user_id;
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
+    if (!profileResponse.ok) {
+      return NextResponse.json({ error: 'Failed to get profile' }, { status: profileResponse.status });
     }
 
-    const rewardsResponse = await fetch(`${BACKEND_URL}/api/user/${userId}/rewards`, {
-      headers: {
-        'Authorization': authHeader,
-      },
-    });
+    const profileData = await profileResponse.json();
+    const profile = profileData.profile || profileData;
+    const userId = profile.uid || profile.user_id || profile.id;
+    
+    if (!userId) {
+      console.error('Profile data:', profileData);
+      return NextResponse.json({ error: 'User ID not found in profile' }, { status: 400 });
+    }
+
+    const rewardsResponse = await fetch(`${BACKEND_URL}/api/user/${userId}/rewards`);
+
+    if (!rewardsResponse.ok) {
+      return NextResponse.json({ error: 'Failed to fetch rewards' }, { status: rewardsResponse.status });
+    }
 
     const rewardsData = await rewardsResponse.json();
     
-    return NextResponse.json(rewardsData, { status: rewardsResponse.status });
+    return NextResponse.json(rewardsData, { status: 200 });
   } catch (error) {
     console.error('Error fetching rewards:', error);
     return NextResponse.json({ error: 'Failed to fetch rewards' }, { status: 500 });
