@@ -15,7 +15,7 @@ export async function GET(
       headers['Authorization'] = authHeader;
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/trips/${tripId}`, {
+    const response = await fetch(`${BACKEND_URL}/api/trip/${tripId}`, {
       headers,
     });
 
@@ -40,7 +40,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'No authorization header' }, { status: 401 });
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/trips/${tripId}`, {
+    const response = await fetch(`${BACKEND_URL}/api/trip/${tripId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': authHeader,
