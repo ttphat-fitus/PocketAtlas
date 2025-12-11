@@ -308,7 +308,7 @@ export default function TripDetailPage() {
           throw new Error("Not authenticated");
         }
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/trip/${tripId}`, {
+        const response = await fetch(`/api/trip/${tripId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -367,7 +367,7 @@ export default function TripDetailPage() {
         throw new Error("Not authenticated");
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/trip/${tripId}/rating`, {
+      const response = await fetch(`/api/trip/${tripId}/rating`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -396,7 +396,7 @@ export default function TripDetailPage() {
 
     try {
       const token = await getIdToken();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/trip/${tripId}/generate-podcast`, {
+      const response = await fetch(`/api/trip/${tripId}/podcast`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -444,7 +444,7 @@ export default function TripDetailPage() {
 
     try {
       const token = await getIdToken();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/trip/${tripId}/cover-image`, {
+      const response = await fetch(`/api/trip/${tripId}/cover`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -735,7 +735,7 @@ export default function TripDetailPage() {
                       
                       try {
                         const token = await getIdToken();
-                        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/trip/${tripId}/toggle-public`, {
+                        const response = await fetch(`/api/trip/${tripId}/toggle-public`, {
                           method: "POST",
                           headers: {
                             Authorization: `Bearer ${token}`,

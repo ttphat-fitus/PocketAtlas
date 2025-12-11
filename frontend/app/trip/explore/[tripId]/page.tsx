@@ -113,7 +113,7 @@ export default function ExploreDetailPage() {
         }
 
         // Increment view count
-        await fetch(getApiUrl(`/api/trip/${tripId}/view`), {
+        await fetch(`/api/trip/${tripId}/view`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_id: userId || "anonymous" }),
@@ -145,7 +145,7 @@ export default function ExploreDetailPage() {
     const currentUserId = user?.uid || "anonymous";
 
     try {
-      const response = await fetch(getApiUrl(`/api/trip/${tripId}/like`), {
+      const response = await fetch(`/api/trip/${tripId}/like`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: currentUserId }),

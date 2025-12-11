@@ -315,7 +315,7 @@ export default function ProfilePage() {
     
     try {
       const token = await getIdToken();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/liked-trips`, {
+      const response = await fetch(`/api/profile/liked-trips`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -341,7 +341,7 @@ export default function ProfilePage() {
         return;
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/profile`, {
+      const response = await fetch(`/api/profile`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,

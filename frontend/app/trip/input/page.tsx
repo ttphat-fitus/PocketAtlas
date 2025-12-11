@@ -78,7 +78,7 @@ export default function TripInputPage() {
       }
 
       setLoadingProgress(30);
-      const response = await fetch(getApiUrl("/api/plan-trip"), {
+      const response = await fetch("/api/plan-trip", {
         method: "POST",
         headers,
         body: JSON.stringify(formData),

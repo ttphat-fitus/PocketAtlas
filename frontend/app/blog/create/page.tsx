@@ -66,7 +66,7 @@ export default function CreateBlogPage() {
       
       try {
         const token = await getIdToken();
-        const response = await fetch(getApiUrl("/api/my-trips"), {
+        const response = await fetch("/api/trips", {
           headers: { Authorization: `Bearer ${token}` },
         });
         
@@ -109,7 +109,7 @@ export default function CreateBlogPage() {
     
     try {
       const token = await getIdToken();
-      const response = await fetch(getApiUrl("/api/blog/generate-from-trip"), {
+      const response = await fetch("/api/blog/generate", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -154,7 +154,7 @@ export default function CreateBlogPage() {
     
     try {
       const token = await getIdToken();
-      const response = await fetch(getApiUrl("/api/blog/create"), {
+      const response = await fetch("/api/blog/create", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
