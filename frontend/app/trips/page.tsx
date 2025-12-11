@@ -124,10 +124,9 @@ export default function MyTripsPage() {
         throw new Error("No authentication token available. Please log in again.");
       }
 
-      const apiUrl = getApiUrl("/api/my-trips");
-      console.log("Fetching from:", apiUrl);
+      console.log("Fetching trips from Next.js API route");
 
-      const response = await fetch(apiUrl, {
+      const response = await fetch("/api/trips", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -161,7 +160,7 @@ export default function MyTripsPage() {
 
     try {
       const token = await getIdToken();
-      const response = await fetch(getApiUrl(`/api/trip/${tripId}`), {
+      const response = await fetch(`/api/trip/${tripId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,

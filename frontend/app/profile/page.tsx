@@ -178,7 +178,7 @@ export default function ProfilePage() {
     if (!user) return;
     
     try {
-      const response = await fetch(getApiUrl(`/api/user/${user.uid}/stats`));
+      const response = await fetch(`/api/profile/stats`);
       if (response.ok) {
         const data = await response.json();
         setBadges(data.badges || []);
@@ -195,7 +195,7 @@ export default function ProfilePage() {
     if (!user) return;
     
     try {
-      const response = await fetch(getApiUrl(`/api/user/${user.uid}/rewards`));
+      const response = await fetch(`/api/profile/rewards`);
       if (response.ok) {
         const data = await response.json();
         setRewards(data.available_rewards || []);
@@ -238,7 +238,7 @@ export default function ProfilePage() {
     
     try {
       const token = await getIdToken();
-      const response = await fetch(getApiUrl("/api/user/profile"), {
+      const response = await fetch("/api/profile", {
         headers: {
           Authorization: `Bearer ${token}`,
         },

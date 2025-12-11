@@ -36,7 +36,7 @@ export default function BlogPage() {
   useEffect(() => {
     const fetchBlogs = async () => {
       try {
-        const response = await fetch(getApiUrl("/api/blogs"));
+        const response = await fetch("/api/blog");
         if (response.ok) {
           const data = await response.json();
           setUserBlogs(data.blogs || []);

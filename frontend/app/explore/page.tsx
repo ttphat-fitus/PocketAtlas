@@ -108,7 +108,7 @@ export default function ExplorePage() {
       if (selectedCategories.length > 0) params.append("category_tags", selectedCategories.join(","));
       if (searchQuery) params.append("search", searchQuery);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/catalog/trips?${params}`);
+      const res = await fetch(`/api/explore?${params}`);
       if (!res.ok) throw new Error("Failed to fetch trips");
       const data = await res.json();
       const list: PublicTrip[] = data.trips || [];
@@ -143,7 +143,7 @@ export default function ExplorePage() {
   const handleViewTrip = async (tripId: string) => {
     // Increment view count
     try {
-      await fetch(getApiUrl(`/api/trip/${tripId}/view`), {
+      await fetch(`/api/trip/${tripId}/view`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: "anonymous" }),
