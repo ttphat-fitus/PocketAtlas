@@ -1,19 +1,7 @@
 import type { Metadata } from "next";
-import { Roboto, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "../contexts/LanguageContext";
 import { AuthProvider } from "../contexts/AuthContext";
-
-const body = Roboto({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-body",
-});
-const heading = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["600", "700"],
-  variable: "--font-heading",
-});
 
 export const metadata: Metadata = {
   title: "Pocket Atlas - AI Travel Planner",
@@ -28,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${body.variable} ${heading.variable} font-sans antialiased bg-white text-slate-900`}
+        className="font-sans antialiased bg-white text-slate-900"
         suppressHydrationWarning
       >
         <AuthProvider>
