@@ -319,13 +319,9 @@ export default function TripDetailPage() {
         }
 
         const data = await response.json();
-        console.log("Trip data fetched:", data);
-        console.log("Weather data from API:", data.weather);
         
         // Extract cover image from either location
         const coverImage = data.trip_plan?.cover_image || data.cover_image || "";
-        console.log("Cover image URL:", coverImage);
-        console.log("Trip plan structure:", data.trip_plan);
         
         setTripData(data);
         // Ensure tripPlan has cover_image
@@ -337,10 +333,7 @@ export default function TripDetailPage() {
         
         // Extract weather data if available
         if (data.weather) {
-          console.log("Setting weather data:", data.weather);
           setWeatherData(data.weather);
-        } else {
-          console.warn("No weather data available in trip");
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load trip");

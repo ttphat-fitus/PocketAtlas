@@ -31,7 +31,6 @@ export async function GET(request: NextRequest) {
     const userId = profile.uid || profile.user_id || profile.id;
     
     if (!userId) {
-      console.error('Profile data:', profileData);
       return NextResponse.json({ error: 'User ID not found in profile' }, { status: 400 });
     }
 

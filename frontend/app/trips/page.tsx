@@ -112,18 +112,11 @@ export default function MyTripsPage() {
 
   const fetchTrips = async () => {
     try {
-      console.log("Starting to fetch trips...");
-      console.log("User:", user?.uid);
-      console.log("Auth loading:", authLoading);
-
       const token = await getIdToken();
-      console.log("Got token:", token ? token.substring(0, 20) + "..." : "null");
       
       if (!token) {
         throw new Error("No authentication token available. Please log in again.");
       }
-
-      console.log("Fetching trips from Next.js API route");
 
       const response = await fetch("/api/trips", {
         method: "GET",
@@ -133,19 +126,14 @@ export default function MyTripsPage() {
         },
       });
 
-      console.log("Response status:", response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Error response:", errorText);
         throw new Error(`Failed to fetch trips (${response.status}): ${errorText}`);
       }
 
       const data = await response.json();
-      console.log("Trips data:", data);
       setTrips(data.trips || []);
     } catch (err) {
-      console.error("Full error:", err);
       setError(err instanceof Error ? err.message : "Failed to load trips");
     } finally {
       setLoading(false);
