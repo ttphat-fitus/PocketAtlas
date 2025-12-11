@@ -70,7 +70,7 @@ Create `backend/key/` directory and add the API JSON files
 uvicorn main:app --reload --port 8000
 ```
 
-The API will be available at `http://localhost:8000`
+The API will be available at `${process.env.NEXT_PUBLIC_BACKEND_URL}`
 
 ### Frontend Setup
 

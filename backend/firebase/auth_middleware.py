@@ -26,7 +26,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         
         print(f"[AUTH] Attempting to verify token...")
         decoded_token = firebase_auth.verify_id_token(token)
-        print(f"[AUTH] ✓ Token verified for user: {decoded_token.get('uid')}")
+        print(f"[AUTH] Token verified for user: {decoded_token.get('uid')}")
         return {
             "uid": decoded_token.get("uid"),
             "email": decoded_token.get("email"),

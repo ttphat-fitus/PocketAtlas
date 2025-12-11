@@ -108,7 +108,7 @@ export default function ExplorePage() {
       if (selectedCategories.length > 0) params.append("category_tags", selectedCategories.join(","));
       if (searchQuery) params.append("search", searchQuery);
 
-      const res = await fetch(`http://localhost:8000/api/catalog/trips?${params}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/catalog/trips?${params}`);
       if (!res.ok) throw new Error("Failed to fetch trips");
       const data = await res.json();
       const list: PublicTrip[] = data.trips || [];

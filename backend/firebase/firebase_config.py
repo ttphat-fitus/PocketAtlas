@@ -14,30 +14,26 @@ _firebase_db = None
 _initialized = False
 
 def _get_firebase_credentials():
-    """Get Firebase credentials from environment variable or file"""
     # Try to load from FIREBASE_CREDENTIALS env var (JSON string)
     firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS")
     if firebase_creds_json:
         try:
             creds_dict = json.loads(firebase_creds_json)
-            print("✓ Firebase credentials loaded from FIREBASE_CREDENTIALS env var")
+            print("Firebase credentials loaded from FIREBASE_CREDENTIALS env var")
             return credentials.Certificate(creds_dict)
         except json.JSONDecodeError as e:
-            print(f"✗ Error parsing FIREBASE_CREDENTIALS: {e}")
+            print(f"Error parsing FIREBASE_CREDENTIALS: {e}")
     
     # Try to load from file path
     firebase_key_path = os.getenv("FIREBASE_KEY_PATH")
     
-    possible_paths = [
-        firebase_key_path,  # From env var (Render secret file)
-        "/etc/secret_files/firebase_key.json",  # Render default secret file path
-        os.path.join(os.path.dirname(__file__), "..", "key", "firebase_key.json"),  # Local dev
-    ]
+    possible_paths = os.path.join(os.path.dirname(__file__), "..", "key", "firebase_key.json"),  # Local dev
+
     
     # Find the first existing path
     for path in possible_paths:
         if path and os.path.exists(path):
-            print(f"✓ Firebase key found at: {path}")
+            print(f"Firebase key found at: {path}")
             return credentials.Certificate(path)
     
     return None
@@ -52,23 +48,22 @@ def _initialize_firebase():
     cred = _get_firebase_credentials()
     
     if not cred:
-        print("⚠ Firebase key not found. Some features may not work.")
-        print("  Set FIREBASE_CREDENTIALS or FIREBASE_KEY_PATH env var.")
+        print("Firebase key not found. Some features may not work.")
+        print("Set FIREBASE_CREDENTIALS or FIREBASE_KEY_PATH env var.")
         _initialized = True
         return
     
     try:
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred)
-        print("✓ Firebase initialized successfully")
+        print("Firebase initialized successfully")
         _initialized = True
     except Exception as e:
-        print(f"✗ Error initializing Firebase: {e}")
+        print(f"Error initializing Firebase: {e}")
         _initialized = True
         raise
 
 def get_auth():
-    """Get Firebase auth (with lazy initialization)"""
     global _firebase_auth
     _initialize_firebase()
     if not _firebase_auth:
@@ -76,12 +71,11 @@ def get_auth():
             _firebase_auth = auth
             return _firebase_auth
         except Exception as e:
-            print(f"✗ Error getting Firebase auth: {e}")
+            print(f"Error getting Firebase auth: {e}")
             return None
     return _firebase_auth
 
 def get_db():
-    """Get Firestore DB (with lazy initialization)"""
     global _firebase_db
     _initialize_firebase()
     if not _firebase_db:

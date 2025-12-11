@@ -124,7 +124,7 @@ export default function MyTripsPage() {
         throw new Error("Not authenticated");
       }
 
-      const response = await fetch("http://localhost:8000/api/my-trips", {
+      const response = await fetch("${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-trips", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -150,7 +150,7 @@ export default function MyTripsPage() {
 
     try {
       const token = await getIdToken();
-      const response = await fetch(`http://localhost:8000/api/trip/${tripId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/trip/${tripId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
