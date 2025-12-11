@@ -212,7 +212,7 @@ export default function ProfilePage() {
     
     try {
       const token = await getIdToken();
-      const response = await fetch(getApiUrl("/api/user/redeem-reward"), {
+      const response = await fetch("/api/profile/redeem-reward", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

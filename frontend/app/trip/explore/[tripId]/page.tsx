@@ -99,7 +99,7 @@ export default function ExploreDetailPage() {
 
         // Fetch full trip details using public endpoint
         const detailResponse = await fetch(
-          getApiUrl(`/api/public-trip/${tripId}`)
+          `/api/public-trip/${tripId}`
         );
 
         if (detailResponse.ok) {
@@ -122,7 +122,7 @@ export default function ExploreDetailPage() {
         // Check if current user has liked this trip
         if (user?.uid) {
           const likeCheckResponse = await fetch(
-            getApiUrl(`/api/trip/${tripId}/like-status?user_id=${user.uid}`)
+            `/api/trip/${tripId}/like-status?user_id=${user.uid}`
           );
           if (likeCheckResponse.ok) {
             const likeData = await likeCheckResponse.json();
