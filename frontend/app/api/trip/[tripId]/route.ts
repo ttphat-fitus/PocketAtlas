@@ -10,18 +10,44 @@ export async function GET(
     const { tripId } = await params;
     const authHeader = request.headers.get('authorization');
     
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
     if (authHeader) {
       headers['Authorization'] = authHeader;
     }
 
     const response = await fetch(`${BACKEND_URL}/api/trip/${tripId}`, {
       headers,
+      cache: 'no-store',
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Backend error ${response.status}:`, errorText);
+      return NextResponse.json(
+        { error: errorText || 'Failed to fetch trip' },
+        { 
+          status: response.status,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        }
+      );
+    }
 
     const data = await response.json();
     
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data, { 
+      status: response.status,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      }
+    });
   } catch (error) {
     console.error('Error fetching trip:', error);
     return NextResponse.json({ error: 'Failed to fetch trip' }, { status: 500 });
@@ -57,4 +83,15 @@ export async function DELETE(
     console.error('Error deleting trip:', error);
     return NextResponse.json({ error: 'Failed to delete trip' }, { status: 500 });
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
 }

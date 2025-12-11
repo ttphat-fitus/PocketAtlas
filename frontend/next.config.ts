@@ -3,9 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
-  webpack: (config, { isServer }) => {
-    return config;
-  },
+  output: 'standalone',
+  turbopack: {},
 };
 
 export default nextConfig;
