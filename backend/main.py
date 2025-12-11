@@ -30,6 +30,7 @@ allowed_origins = [
     "http://localhost:3001",  # Alternative local port
     "http://127.0.0.1:3000",  # Local IP
     "https://pocketatlas.vercel.app",  # Main Vercel production
+    "http://34.142.227.210:3000",  # GCP frontend (if running on same instance)
 ]
 
 # Add production URLs if configured
