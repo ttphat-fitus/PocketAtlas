@@ -4,10 +4,11 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:800
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { tripId: string } }
+  { params }: { params: Promise<{ tripId: string }> }
 ) {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/trip/${params.tripId}/view`, {
+    const { tripId } = await params;
+    const response = await fetch(`${BACKEND_URL}/api/trip/${tripId}/view`, {
       method: 'POST',
     });
 

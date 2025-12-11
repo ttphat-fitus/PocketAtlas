@@ -4,9 +4,10 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:800
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tripId: string } }
+  { params }: { params: Promise<{ tripId: string }> }
 ) {
   try {
+    const { tripId } = await params;
     const authHeader = request.headers.get('authorization');
     
     const headers: Record<string, string> = {};
@@ -14,7 +15,7 @@ export async function GET(
       headers['Authorization'] = authHeader;
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/trips/${params.tripId}`, {
+    const response = await fetch(`${BACKEND_URL}/api/trips/${tripId}`, {
       headers,
     });
 
@@ -29,16 +30,17 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { tripId: string } }
+  { params }: { params: Promise<{ tripId: string }> }
 ) {
   try {
+    const { tripId } = await params;
     const authHeader = request.headers.get('authorization');
     
     if (!authHeader) {
       return NextResponse.json({ error: 'No authorization header' }, { status: 401 });
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/trips/${params.tripId}`, {
+    const response = await fetch(`${BACKEND_URL}/api/trips/${tripId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': authHeader,
