@@ -82,7 +82,7 @@ export default function ExploreDetailPage() {
         
         // Fetch public trip data
         const response = await fetch(
-          getApiUrl("/api/catalog/trips?page=1&limit=100")
+          "/api/explore?page=1&limit=100"
         );
 
         if (!response.ok) {
