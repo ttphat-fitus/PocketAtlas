@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import google.generativeai as genai
 
-# Load environment variables from .env file
+load_dotenv('.env.local')
 load_dotenv()
 
 # Load API Keys from environment or JSON files

@@ -2,8 +2,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
-
-# Load environment variables
+load_dotenv('.env.local')
 load_dotenv()
 
 # Import routers
