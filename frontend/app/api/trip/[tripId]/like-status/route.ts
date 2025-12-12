@@ -4,10 +4,11 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:800
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ tripId: string }> }
+  segmentData: { params: Promise<{ tripId: string }> }
 ) {
+  const params = await segmentData.params;
   try {
-    const { tripId } = await params;
+    const { tripId } = params;
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('user_id');
 

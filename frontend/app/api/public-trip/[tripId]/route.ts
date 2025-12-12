@@ -5,10 +5,11 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_U
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ tripId: string }> }
+  segmentData: { params: Promise<{ tripId: string }> }
 ) {
+  const params = await segmentData.params;
   try {
-    const { tripId } = await params;
+    const { tripId } = params;
     
     console.log('[API Route] GET /api/public-trip/[tripId]');
     console.log('Backend URL:', BACKEND_URL);
