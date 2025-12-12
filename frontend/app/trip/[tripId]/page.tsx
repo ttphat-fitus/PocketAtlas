@@ -331,6 +331,11 @@ export default function TripDetailPage() {
         setCoverImageUrl(coverImage);
         setCoverImageLoaded(false);
         
+        // Load saved podcast URL if exists
+        if (data.podcast_url) {
+          setPodcastUrl(data.podcast_url);
+        }
+        
         // Extract weather data if available
         if (data.weather) {
           setWeatherData(data.weather);
@@ -669,31 +674,53 @@ export default function TripDetailPage() {
                       {language === "en" ? "Travel Podcast" : "Podcast du lịch"}
                     </span>
                   </div>
-                  <button
-                    onClick={handleGeneratePodcast}
-                    disabled={podcastGenerating}
-                    className="btn btn-sm btn-outline btn-purple w-full gap-2 mb-2 tap-target"
-                  >
-                    {podcastGenerating ? (
-                      <>
-                        <span className="loading loading-spinner loading-xs"></span>
-                        {language === "en" ? "Generating..." : "Đang tạo..."}
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        {language === "en" ? "Generate" : "Tạo podcast"}
-                      </>
-                    )}
-                  </button>
-                  {podcastUrl && (
-                    <div className="mt-2">
-                      <audio controls className="w-full">
-                        <source src={podcastUrl} type="audio/mpeg" />
-                      </audio>
-                    </div>
+                  {podcastUrl ? (
+                    <>
+                      <div className="mt-3 mb-3">
+                        <audio controls className="w-full rounded-lg">
+                          <source src={podcastUrl} type="audio/mpeg" />
+                        </audio>
+                      </div>
+                      <button
+                        onClick={handleGeneratePodcast}
+                        disabled={podcastGenerating}
+                        className="btn btn-sm btn-ghost btn-outline w-full gap-2 tap-target text-xs"
+                      >
+                        {podcastGenerating ? (
+                          <>
+                            <span className="loading loading-spinner loading-xs"></span>
+                            {language === "en" ? "Regenerating..." : "Đang tạo lại..."}
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            {language === "en" ? "Regenerate" : "Tạo lại podcast"}
+                          </>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleGeneratePodcast}
+                      disabled={podcastGenerating}
+                      className="btn btn-sm btn-outline btn-purple w-full gap-2 mb-2 tap-target"
+                    >
+                      {podcastGenerating ? (
+                        <>
+                          <span className="loading loading-spinner loading-xs"></span>
+                          {language === "en" ? "Generating..." : "Đang tạo..."}
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          {language === "en" ? "Generate" : "Tạo podcast"}
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
 

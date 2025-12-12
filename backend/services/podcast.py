@@ -108,6 +108,13 @@ class PodcastService:
             
             db.collection("podcasts").document(trip_id).set(podcast_data)
             
+            # Also save podcast_url to trip document for easy access
+            db.collection("trips").document(trip_id).update({
+                "podcast_url": audio_data_url,
+                "podcast_language": language,
+                "podcast_generated_at": datetime.now().isoformat()
+            })
+            
             return {
                 "success": True,
                 "podcast_url": audio_data_url,
