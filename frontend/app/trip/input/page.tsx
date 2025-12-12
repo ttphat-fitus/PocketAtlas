@@ -178,7 +178,7 @@ export default function TripInputPage() {
                   <input
                     type="range"
                     min="1"
-                    max="7"
+                    max="14"
                     value={formData.duration}
                     className="range range-primary flex-1"
                     onChange={(e) =>
