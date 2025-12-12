@@ -90,10 +90,8 @@ class PodcastService:
                 voice_name=f"{language}-VN-Neural2-A"
             )
             
-            # Convert audio to base64 data URL for immediate playback
-            import base64
-            audio_base64 = base64.b64encode(audio_content).decode('utf-8')
-            audio_data_url = f"data:audio/mpeg;base64,{audio_base64}"
+            # Upload audio file to Firebase Storage instead of storing as base64
+            storage_url = self._upload_to_firebase_storage(trip_id, audio_content, language)
             
             # Save metadata to Firestore
             podcast_data = {
@@ -110,14 +108,14 @@ class PodcastService:
             
             # Also save podcast_url to trip document for easy access
             db.collection("trips").document(trip_id).update({
-                "podcast_url": audio_data_url,
+                "podcast_url": storage_url,
                 "podcast_language": language,
                 "podcast_generated_at": datetime.now().isoformat()
             })
             
             return {
                 "success": True,
-                "podcast_url": audio_data_url,
+                "podcast_url": storage_url,
                 "podcast": podcast_data,
                 "message": "Podcast generated successfully"
             }
@@ -257,6 +255,41 @@ CHỈ TRẢ VỀ JSON, KHÔNG TEXT KHÁC.
             
         except Exception as e:
             print(f"Error in text-to-speech: {e}")
+            raise
+    
+    def _upload_to_firebase_storage(self, trip_id: str, audio_content: bytes, language: str) -> str:
+        """Upload audio file to Firebase Storage and return public URL"""
+        try:
+            from firebase_admin import storage as fb_storage
+            
+            # Create filename with timestamp to ensure uniqueness
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"podcasts/{trip_id}/podcast_{language}_{timestamp}.mp3"
+            
+            # Get default bucket
+            bucket = fb_storage.bucket()
+            blob = bucket.blob(filename)
+            
+            # Upload with metadata
+            blob.upload_from_string(
+                audio_content,
+                content_type='audio/mpeg',
+                metadata={
+                    'trip_id': trip_id,
+                    'language': language,
+                    'generated_at': datetime.now().isoformat()
+                }
+            )
+            
+            # Make blob publicly accessible and get URL
+            blob.make_public()
+            public_url = blob.public_url
+            
+            print(f"[OK] Podcast uploaded to Storage: {filename}")
+            return public_url
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to upload podcast to Firebase Storage: {e}")
             raise
     
     def get_podcast(self, trip_id: str) -> Optional[dict]:
