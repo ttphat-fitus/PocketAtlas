@@ -8,12 +8,12 @@ from core.config import WEATHER_API_KEY
 def get_weather_forecast(lat: float, lng: float, days: int = 10) -> dict:
     """Get weather forecast using WeatherAPI for detailed conditions"""
     try:
-        # WeatherAPI endpoint - supports up to 14 days on paid plans, 3 on free
+        # WeatherAPI endpoint - supports up to 7 days for trip planning
         url = "http://api.weatherapi.com/v1/forecast.json"
         params = {
             "key": WEATHER_API_KEY,
             "q": f"{lat},{lng}",
-            "days": min(days, 14),
+            "days": min(days, 7),
             "aqi": "no",
             "alerts": "no"
         }
@@ -63,7 +63,7 @@ async def get_weather_forecast_async(lat: float, lng: float, days: int = 10) -> 
         params = {
             "key": WEATHER_API_KEY,
             "q": f"{lat},{lng}",
-            "days": min(days, 14),
+            "days": min(days, 7),
             "aqi": "no",
             "alerts": "no"
         }
