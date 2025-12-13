@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "../../../contexts/LanguageContext";
+import { useAuth } from "../../../contexts/AuthContext";
 import {
   DndContext,
   closestCenter,
@@ -52,6 +53,51 @@ const formatPrice = (price: string | undefined): string => {
   return price.replace(/VND/gi, '₫').replace(/đ/g, '₫');
 };
 
+function formatVndNumber(value: number): string {
+  try {
+    return Math.round(value).toLocaleString("vi-VN");
+  } catch {
+    return String(Math.round(value));
+  }
+}
+
+function parseVndRange(raw: string | undefined): { min: number; max: number } {
+  if (!raw) return { min: 0, max: 0 };
+  const text = raw.trim().toLowerCase();
+  if (!text) return { min: 0, max: 0 };
+  if (text.includes("miễn phí") || text === "free") return { min: 0, max: 0 };
+
+  // Normalize separators and pick up numbers like 150.000, 200000, 150 000
+  const normalized = text
+    .replace(/₫/g, "")
+    .replace(/vnd/g, "")
+    .replace(/đ/g, "")
+    .replace(/–/g, "-")
+    .replace(/,/g, ".");
+
+  const numbers = normalized.match(/\d[\d\.\s]*/g) || [];
+  const parsed = numbers
+    .map((s) => Number(s.replace(/[\s\.]/g, "")))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+
+  if (parsed.length === 0) return { min: 0, max: 0 };
+  if (parsed.length === 1) return { min: parsed[0], max: parsed[0] };
+  return { min: parsed[0], max: parsed[1] };
+}
+
+function sumVndRanges(ranges: Array<{ min: number; max: number }>): { min: number; max: number } {
+  return ranges.reduce(
+    (acc, r) => ({ min: acc.min + r.min, max: acc.max + r.max }),
+    { min: 0, max: 0 }
+  );
+}
+
+function vndMidpoint(raw: string | undefined): number {
+  const { min, max } = parseVndRange(raw);
+  if (min === 0 && max === 0) return 0;
+  return Math.round((min + max) / 2);
+}
+
 interface PlaceDetails {
   name: string;
   address: string;
@@ -61,17 +107,35 @@ interface PlaceDetails {
   lat: number;
   lng: number;
   types?: string[];
+  place_id?: string;
+  google_maps_link?: string;
   booking_link?: string;
   is_hotel?: boolean;
 }
 
+function googleMapsHref(details?: PlaceDetails): string {
+  if (!details) return "";
+  if (details.google_maps_link) return details.google_maps_link;
+  if (details.place_id) {
+    return `https://www.google.com/maps/search/?api=1&query=place_id:${encodeURIComponent(
+      details.place_id
+    )}`;
+  }
+  if (typeof details.lat === "number" && typeof details.lng === "number" && details.lat && details.lng) {
+    return `https://www.google.com/maps/search/?api=1&query=${details.lat},${details.lng}`;
+  }
+  return "";
+}
+
 interface Activity {
+  client_id?: string;
   time: string;
   place: string;
   description: string;
   estimated_cost: string;
   tips: string;
   place_details?: PlaceDetails;
+  _isNew?: boolean;
 }
 
 interface Day {
@@ -100,6 +164,61 @@ interface TripPlan {
   travel_tips: string[];
   weather_forecast?: WeatherForecast[];
   cover_image?: string;
+  trip_id?: string;
+}
+
+function isHotelLikeQuery(text: string): boolean {
+  const t = (text || "").toLowerCase();
+  return (
+    t.includes("hotel") ||
+    t.includes("khách sạn") ||
+    t.includes("khach san") ||
+    t.includes("resort") ||
+    t.includes("homestay") ||
+    t.includes("hostel") ||
+    t.includes("villa") ||
+    t.includes("motel")
+  );
+}
+
+function averageCoordsFromDay(day: Day | undefined | null): { lat: number; lng: number } | null {
+  if (!day?.activities?.length) return null;
+  const coords = day.activities
+    .map((a) => ({ lat: a.place_details?.lat, lng: a.place_details?.lng }))
+    .filter(
+      (c): c is { lat: number; lng: number } =>
+        typeof c.lat === "number" &&
+        typeof c.lng === "number" &&
+        c.lat !== 0 &&
+        c.lng !== 0
+    );
+  if (coords.length === 0) return null;
+  const lat = coords.reduce((s, c) => s + c.lat, 0) / coords.length;
+  const lng = coords.reduce((s, c) => s + c.lng, 0) / coords.length;
+  return { lat, lng };
+}
+
+function newClientId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return (crypto as any).randomUUID();
+  }
+  return `cid_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function ensureActivityIds(plan: TripPlan): TripPlan {
+  let changed = false;
+
+  const days = plan.days.map((day) => {
+    const activities = day.activities.map((activity) => {
+      if (activity.client_id) return activity;
+      changed = true;
+      return { ...activity, client_id: newClientId() };
+    });
+    return { ...day, activities };
+  });
+
+  if (!changed) return plan;
+  return { ...plan, days };
 }
 
 // Helper function to parse time string (e.g., "08:00" or "08:00 - 10:00")
@@ -182,26 +301,36 @@ function recalculateActivityTimes(activities: Activity[], preserveGaps: boolean 
 
 // Sortable Activity Card Component
 interface SortableActivityProps {
+  id: string;
   activity: Activity;
   activityIdx: number;
   dayIndex: number;
   isEditing: boolean;
+  isModalOpen: boolean;
   onEdit: (field: keyof Activity, value: string) => void;
+  onOpenTimeEdit: (currentTime: string) => void;
   onStartEdit: () => void;
   onFinishEdit: () => void;
   onDelete: () => void;
+  onResolvePlace: (query: string) => void;
+  isResolving: boolean;
   t: (key: string) => string;
 }
 
 function SortableActivity({
+  id,
   activity,
   activityIdx,
   dayIndex,
   isEditing,
+  isModalOpen,
   onEdit,
+  onOpenTimeEdit,
   onStartEdit,
   onFinishEdit,
   onDelete,
+  onResolvePlace,
+  isResolving,
   t,
 }: SortableActivityProps) {
   const [showTips, setShowTips] = useState(false);
@@ -212,7 +341,7 @@ function SortableActivity({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: `${dayIndex}-${activityIdx}` });
+  } = useSortable({ id, disabled: isModalOpen });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -224,16 +353,16 @@ function SortableActivity({
     <div
       ref={setNodeRef}
       style={style}
-      className="card bg-white shadow-lg hover:shadow-xl transition-shadow"
+      className="card bg-white shadow-lg hover:shadow-xl transition-shadow relative z-0"
     >
       <div className="card-body">
-        <div className="flex justify-between items-start">
-          <div className="flex gap-3 flex-1">
+        <div className="flex justify-between items-start gap-3">
+          <div className="flex gap-3 flex-1 min-w-0">
             {/* Drag Handle */}
             <div
               {...attributes}
               {...listeners}
-              className="cursor-move flex items-start pt-2 text-gray-400 hover:text-gray-600"
+              className="cursor-move flex items-start pt-2 text-gray-400 hover:text-gray-600 touch-none select-none"
               title="Drag to reorder"
             >
               <svg
@@ -252,27 +381,28 @@ function SortableActivity({
               </svg>
             </div>
 
-            <div className="flex-1">
-              {/* Time, Price, Tips Toggle - All in one row */}
+            <div className="flex-1 min-w-0">
+              {/* Time (Manual Edit), Price, Tips Toggle - All in one row */}
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                {isEditing ? (
-                  <input
-                    type="text"
-                    className="input input-bordered input-sm w-48"
-                    value={activity.time}
-                    onChange={(e) => onEdit("time", e.target.value)}
-                  />
-                ) : (
-                  <div className="badge badge-primary badge-outline font-medium">
-                    {activity.time}
-                  </div>
-                )}
+                <button
+                  onClick={() => {
+                    onOpenTimeEdit(activity.time);
+                  }}
+                  className="btn btn-xs btn-primary gap-1"
+                  title="Chỉnh sửa thời gian"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {activity.time}
+                </button>
 
-                {/* Price Badge - with better wrapping for long prices */}
-                {isEditing ? (
+                {/* Price Badge */}
+                {/* {isEditing ? (
                   <input
                     type="text"
-                    className="input input-bordered input-sm w-40"
+                    className="input input-bordered input-sm w-44"
+                    placeholder={t("plan.estimatedCost")}
                     value={activity.estimated_cost}
                     onChange={(e) => onEdit("estimated_cost", e.target.value)}
                   />
@@ -280,10 +410,10 @@ function SortableActivity({
                   <div className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full whitespace-nowrap">
                     {formatPrice(activity.estimated_cost)}
                   </div>
-                )}
+                )} */}
 
                 {/* Tips Toggle Button */}
-                {activity.tips && !isEditing && (
+                {/* {activity.tips && !isEditing && (
                   <button
                     onClick={() => setShowTips(!showTips)}
                     className={`btn btn-xs gap-1 ${showTips ? 'btn-info' : 'btn-ghost btn-outline'}`}
@@ -296,21 +426,41 @@ function SortableActivity({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
-                )}
+                )} */}
               </div>
 
-              {isEditing ? (
-                <input
-                  type="text"
-                  className="input input-bordered w-full mb-2"
-                  value={activity.place}
-                  onChange={(e) => onEdit("place", e.target.value)}
-                />
-              ) : (
+              {(isEditing || activity._isNew || !activity.place) ? (
                 <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-xl font-bold text-gray-800">
-                    {activity.place}
-                  </h3>
+                  <input
+                    type="text"
+                    className="input input-bordered w-full"
+                    placeholder={t("Nhập địa điểm")}
+                    value={activity.place}
+                    autoFocus={Boolean(activity._isNew || !activity.place)}
+                    onChange={(e) => onEdit("place", e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onResolvePlace(activity.place);
+                      }
+                    }}
+                  />
+                  <button
+                    className={`btn btn-sm btn-outline ${isResolving ? "loading" : ""}`}
+                    onClick={() => onResolvePlace(activity.place)}
+                    disabled={isResolving}
+                    title="Search and enrich"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.6-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 mb-2 min-w-0">
+                  <button className="text-left min-w-0" onClick={onStartEdit} title="Edit">
+                    <h3 className="text-xl font-bold text-gray-800 truncate">{activity.place}</h3>
+                  </button>
                   {/* Booking.com link for hotels */}
                   {activity.place_details?.is_hotel && activity.place_details?.booking_link && (
                     <a
@@ -340,19 +490,23 @@ function SortableActivity({
                       {activity.place_details.address}
                     </p>
                   </div>
-                  {activity.place_details.lat !== 0 && (
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${activity.place_details.lat},${activity.place_details.lng}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 mt-2 ml-2 text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                      </svg>
-                      {t("plan.openMaps")}
-                    </a>
-                  )}
+                  {(() => {
+                    const href = googleMapsHref(activity.place_details);
+                    if (!href) return null;
+                    return (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 mt-2 ml-2 text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        </svg>
+                        {t("plan.openMaps")}
+                      </a>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -370,7 +524,7 @@ function SortableActivity({
                 </div>
               )}
 
-              {isEditing ? (
+              {/* {isEditing ? (
                 <textarea
                   className="textarea textarea-bordered w-full mb-2"
                   value={activity.description}
@@ -378,7 +532,7 @@ function SortableActivity({
                 />
               ) : (
                 <p className="text-gray-700 mb-3">{activity.description}</p>
-              )}
+              )} */}
 
               {/* Collapsible Tips Section */}
               {activity.tips && (showTips || isEditing) && (
@@ -416,41 +570,73 @@ function SortableActivity({
             </div>
           </div>
 
-          {/* Temporarily hidden - Edit/Delete/Maps features */}
-          {false && (
           <div className="flex flex-col gap-2 ml-4">
             {isEditing ? (
-              <button
-                className="btn btn-success btn-sm"
-                onClick={onFinishEdit}
-              >
+              <button className="btn btn-success btn-sm" onClick={onFinishEdit}>
                 {t("plan.done")}
               </button>
             ) : (
               <button className="btn btn-ghost btn-sm" onClick={onStartEdit}>
-                Edit
+                Sửa
               </button>
             )}
-            <button
-              className="btn btn-ghost btn-sm text-error"
-              onClick={onDelete}
-            >
-              Delete
+            <button className="btn btn-ghost btn-sm text-error" onClick={onDelete}>
+              Xóa
             </button>
-            {activity.place_details?.lat !== 0 && (
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${activity.place_details?.lat},${activity.place_details?.lng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-ghost btn-sm"
-              >
-                Map
-              </a>
-            )}
           </div>
-          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function SortableRouteItem({
+  id,
+  index,
+  label,
+}: {
+  id: string;
+  index: number;
+  label: string;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-grab active:cursor-grabbing touch-none select-none"
+      {...attributes}
+      {...listeners}
+    >
+      <div className="text-gray-400 hover:text-gray-600 flex-shrink-0" title="Drag to reorder">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+        </svg>
+      </div>
+      <div className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+        {index + 1}
+      </div>
+      <div className="text-sm font-medium text-gray-800 min-w-0 truncate">{label || ""}</div>
     </div>
   );
 }
@@ -458,8 +644,11 @@ function SortableActivity({
 export default function TripPlanPage() {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
+  const { user, loading: authLoading, getIdToken } = useAuth();
   const [tripPlan, setTripPlan] = useState<TripPlan | null>(null);
   const [tripParams, setTripParams] = useState<any>(null);
+  const [backHref, setBackHref] = useState<string | null>(null);
+  const [backLabel, setBackLabel] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState(1);
   const [editingActivity, setEditingActivity] = useState<{
     dayIndex: number;
@@ -467,10 +656,22 @@ export default function TripPlanPage() {
   } | null>(null);
   const [showPackingList, setShowPackingList] = useState(false);
   const [showTips, setShowTips] = useState(false);
+  const [isRouteMapCollapsed, setIsRouteMapCollapsed] = useState(false);
+  const [isWeatherCollapsed, setIsWeatherCollapsed] = useState(false);
+  const [resolvingActivityIds, setResolvingActivityIds] = useState<Record<string, boolean>>({});
+  const [activeRouteSegmentStartIndex, setActiveRouteSegmentStartIndex] = useState<number | null>(null);
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [timeEditTarget, setTimeEditTarget] = useState<{
+    dayIndex: number;
+    activityIndex: number;
+    currentTime: string;
+  } | null>(null);
+  const [timeEditInput, setTimeEditInput] = useState<string>("");
+  const isTimeEditOpen = Boolean(timeEditTarget);
 
   // Drag and drop sensors
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -479,9 +680,23 @@ export default function TripPlanPage() {
   useEffect(() => {
     const storedPlan = localStorage.getItem("tripPlan");
     const storedParams = localStorage.getItem("tripParams");
+    const storedBackHref = localStorage.getItem("planBackHref");
+    const storedBackLabel = localStorage.getItem("planBackLabel");
+
+    if (storedBackHref) {
+      setBackHref(storedBackHref);
+      localStorage.removeItem("planBackHref");
+    }
+    if (storedBackLabel) {
+      setBackLabel(storedBackLabel);
+      localStorage.removeItem("planBackLabel");
+    }
 
     if (storedPlan) {
-      setTripPlan(JSON.parse(storedPlan));
+      const parsed = JSON.parse(storedPlan);
+      const withIds = ensureActivityIds(parsed);
+      setTripPlan(withIds);
+      localStorage.setItem("tripPlan", JSON.stringify(withIds));
     } else {
       router.push("/trip/input");
     }
@@ -491,6 +706,65 @@ export default function TripPlanPage() {
     }
   }, [router]);
 
+  useEffect(() => {
+    setActiveRouteSegmentStartIndex(null);
+  }, [selectedDay]);
+
+  useEffect(() => {
+    if (!isTimeEditOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isTimeEditOpen]);
+
+  const openTimeEdit = (dayIndex: number, activityIndex: number, currentTime: string) => {
+    setTimeEditTarget({ dayIndex, activityIndex, currentTime });
+    setTimeEditInput(currentTime);
+  };
+
+  const closeTimeEdit = () => {
+    setTimeEditTarget(null);
+    setTimeEditInput("");
+  };
+
+  const handleSavePlan = async () => {
+    if (!tripPlan?.trip_id) return;
+    if (savingPlan) return;
+
+    try {
+      setSavingPlan(true);
+
+      const token = await getIdToken?.();
+      if (!token) {
+        alert(language === "en" ? "You need to sign in to save." : "Bạn cần đăng nhập để lưu.");
+        return;
+      }
+
+      const response = await fetch(`/api/trip/${tripPlan.trip_id}/plan`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ trip_plan: tripPlan }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to save plan");
+      }
+
+      alert(language === "en" ? "Saved successfully." : "Đã lưu kế hoạch.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert(language === "en" ? `Save failed: ${msg}` : `Lưu thất bại: ${msg}`);
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -499,40 +773,154 @@ export default function TripPlanPage() {
     const dayIndex = tripPlan.days.findIndex((d) => d.day === selectedDay);
     if (dayIndex === -1) return;
 
-    const oldIndex = parseInt((active.id as string).split("-")[1]);
-    const newIndex = parseInt((over.id as string).split("-")[1]);
+    const currentActivities = tripPlan.days[dayIndex].activities;
+    const oldIndex = currentActivities.findIndex((a) => a.client_id === active.id);
+    const newIndex = currentActivities.findIndex((a) => a.client_id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
 
     const newPlan = { ...tripPlan };
-    const originalActivities = [...newPlan.days[dayIndex].activities];
-    const reorderedActivities = arrayMove(
-      newPlan.days[dayIndex].activities,
-      oldIndex,
-      newIndex
-    );
-
-    // Recalculate times after reordering - preserve gaps from original order
-    newPlan.days[dayIndex].activities = recalculateActivityTimes(
-      reorderedActivities,
-      true // preserve gaps
-    );
+    newPlan.days = [...newPlan.days];
+    newPlan.days[dayIndex] = {
+      ...newPlan.days[dayIndex],
+      activities: arrayMove(currentActivities, oldIndex, newIndex),
+    };
     
     setTripPlan(newPlan);
     localStorage.setItem("tripPlan", JSON.stringify(newPlan));
+  };
+
+  const handleRouteDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !tripPlan) return;
+
+    const dayIndex = tripPlan.days.findIndex((d) => d.day === selectedDay);
+    if (dayIndex === -1) return;
+
+    const activeId = String(active.id).replace(/^route:/, "");
+    const overId = String(over.id).replace(/^route:/, "");
+
+    const currentActivities = tripPlan.days[dayIndex].activities;
+    const oldIndex = currentActivities.findIndex((a) => a.client_id === activeId);
+    const newIndex = currentActivities.findIndex((a) => a.client_id === overId);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newPlan = { ...tripPlan };
+    newPlan.days = [...newPlan.days];
+    newPlan.days[dayIndex] = {
+      ...newPlan.days[dayIndex],
+      activities: arrayMove(currentActivities, oldIndex, newIndex),
+    };
+
+    setTripPlan(newPlan);
+    localStorage.setItem("tripPlan", JSON.stringify(newPlan));
+  };
+
+  const handleInsertActivity = (
+    dayIndex: number,
+    activityIndex: number,
+    position: "above" | "below"
+  ) => {
+    if (!tripPlan) return;
+
+    const insertAt = position === "above" ? activityIndex : activityIndex + 1;
+    const newActivity: Activity = {
+      client_id: newClientId(),
+      time: "08:00 - 10:00",
+      place: "",
+      description: "",
+      estimated_cost: "",
+      tips: "",
+      _isNew: true,
+    };
+
+    const newPlan = { ...tripPlan };
+    newPlan.days = [...newPlan.days];
+    newPlan.days[dayIndex] = {
+      ...newPlan.days[dayIndex],
+      activities: [...newPlan.days[dayIndex].activities],
+    };
+    newPlan.days[dayIndex].activities.splice(insertAt, 0, newActivity);
+
+    setTripPlan(newPlan);
+    localStorage.setItem("tripPlan", JSON.stringify(newPlan));
+
+    setEditingActivity({ dayIndex, activityIndex: insertAt });
+  };
+
+  const handleResolvePlace = async (
+    dayIndex: number,
+    activityIndex: number,
+    query: string
+  ) => {
+    if (!tripPlan) return;
+
+    const activity = tripPlan.days[dayIndex]?.activities?.[activityIndex];
+    const activityId = activity?.client_id;
+    if (!activityId) return;
+
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
+    try {
+      setResolvingActivityIds((prev) => ({ ...prev, [activityId]: true }));
+
+      const destination = (tripParams?.destination || "").trim();
+      const locationCoords = averageCoordsFromDay(tripPlan.days?.[dayIndex]);
+      const placeTypeHint = isHotelLikeQuery(trimmed) ? "lodging" : undefined;
+      const response = await fetch("/api/trip/resolve-place", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destination,
+          query: trimmed,
+          budget: tripParams?.budget,
+          location_coords: locationCoords,
+          place_type_hint: placeTypeHint,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to resolve place");
+      }
+
+      const newPlan = { ...tripPlan };
+      newPlan.days = [...newPlan.days];
+      newPlan.days[dayIndex] = {
+        ...newPlan.days[dayIndex],
+        activities: [...newPlan.days[dayIndex].activities],
+      };
+
+      const current = newPlan.days[dayIndex].activities[activityIndex];
+      newPlan.days[dayIndex].activities[activityIndex] = {
+        ...current,
+        place: data?.place || current.place || trimmed,
+        description: data?.description || current.description,
+        estimated_cost: data?.estimated_cost || current.estimated_cost,
+        tips: data?.tips || current.tips,
+        place_details: data?.place_details || current.place_details,
+        _isNew: false,
+      };
+
+      setTripPlan(newPlan);
+      localStorage.setItem("tripPlan", JSON.stringify(newPlan));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setResolvingActivityIds((prev) => ({ ...prev, [activityId]: false }));
+    }
   };
 
   const handleDeleteActivity = (dayIndex: number, activityIndex: number) => {
     if (!tripPlan) return;
 
     const newPlan = { ...tripPlan };
+    newPlan.days = [...newPlan.days];
+    newPlan.days[dayIndex] = {
+      ...newPlan.days[dayIndex],
+      activities: [...newPlan.days[dayIndex].activities],
+    };
     newPlan.days[dayIndex].activities.splice(activityIndex, 1);
-    
-    // Recalculate times after deletion - don't preserve gaps to close the schedule
-    if (newPlan.days[dayIndex].activities.length > 0) {
-      newPlan.days[dayIndex].activities = recalculateActivityTimes(
-        newPlan.days[dayIndex].activities,
-        false // no gap preservation on delete
-      );
-    }
     
     setTripPlan(newPlan);
     localStorage.setItem("tripPlan", JSON.stringify(newPlan));
@@ -547,7 +935,16 @@ export default function TripPlanPage() {
     if (!tripPlan) return;
 
     const newPlan = { ...tripPlan };
-    (newPlan.days[dayIndex].activities[activityIndex][field] as string) = value;
+    newPlan.days = [...newPlan.days];
+    newPlan.days[dayIndex] = {
+      ...newPlan.days[dayIndex],
+      activities: [...newPlan.days[dayIndex].activities],
+    };
+    const current = newPlan.days[dayIndex].activities[activityIndex];
+    newPlan.days[dayIndex].activities[activityIndex] = {
+      ...current,
+      [field]: value,
+    } as Activity;
     setTripPlan(newPlan);
     localStorage.setItem("tripPlan", JSON.stringify(newPlan));
   };
@@ -568,10 +965,10 @@ export default function TripPlanPage() {
       <div className="navbar bg-white shadow-md sticky top-0 z-50">
         <div className="navbar-start">
           <button
-            onClick={() => router.push("/trip/input")}
+              onClick={() => router.push(backHref || "/trip/input")}
             className="btn btn-ghost"
           >
-            {t("plan.back")}
+              {backLabel || t("plan.back")}
           </button>
         </div>
         <div className="navbar-center">
@@ -580,6 +977,17 @@ export default function TripPlanPage() {
           </span>
         </div>
         <div className="navbar-end">
+          {tripPlan?.trip_id && !authLoading && user && (
+            <button
+              type="button"
+              className={`btn btn-primary btn-sm ${savingPlan ? "loading" : ""}`}
+              onClick={handleSavePlan}
+              disabled={savingPlan}
+              title={language === "en" ? "Save plan" : "Lưu kế hoạch"}
+            >
+              {language === "en" ? "Save plan" : "Lưu kế hoạch"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -697,60 +1105,74 @@ export default function TripPlanPage() {
         {tripPlan.weather_forecast && tripPlan.weather_forecast.length > 0 && (
           <div className="mt-12 card bg-white shadow-xl mobile-compact">
             <div className="card-body">
-              <div className="flex items-center gap-2 mb-4">
-                <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 2a6 6 0 00-6 6c0 4.314 6 10 6 10s6-5.686 6-10a6 6 0 00-6-6zm0 8a2 2 0 110-4 2 2 0 010 4z"/>
-                </svg>
-                <h3 className="text-2xl font-bold text-gray-800 mobile-heading">
-                  {language === "en" ? "Weather Forecast for Your Trip" : "Dự báo thời tiết cho chuyến đi"}
-                </h3>
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a6 6 0 00-6 6c0 4.314 6 10 6 10s6-5.686 6-10a6 6 0 00-6-6zm0 8a2 2 0 110-4 2 2 0 010 4z"/>
+                  </svg>
+                  <h3 className="text-2xl font-bold text-gray-800 mobile-heading">
+                    {language === "en" ? "Weather Forecast for Your Trip" : "Dự báo thời tiết cho chuyến đi"}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsWeatherCollapsed(!isWeatherCollapsed)}
+                  className="btn btn-xs btn-ghost"
+                  title={isWeatherCollapsed ? "Mở rộng" : "Thu gọn"}
+                >
+                  <svg className={`w-5 h-5 transition-transform ${isWeatherCollapsed ? "" : "rotate-180"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {tripPlan.weather_forecast.map((weather: any, idx: number) => (
-                  <div key={idx} className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-4 shadow-sm border border-blue-100 mobile-full-card">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <div className="text-sm font-semibold text-gray-700">
-                          {language === "en" ? `Day ${weather.day}` : `Ngày ${weather.day}`}
+              {!isWeatherCollapsed && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {tripPlan.weather_forecast.map((weather: any, idx: number) => (
+                    <div key={idx} className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-4 shadow-sm border border-blue-100 mobile-full-card">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-700">
+                            {language === "en" ? `Day ${weather.day}` : `Ngày ${weather.day}`}
+                          </div>
+                          <div className="text-xs text-gray-500">{weather.date}</div>
                         </div>
-                        <div className="text-xs text-gray-500">{weather.date}</div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {weather.temp_max}°
+                          </div>
+                          <div className="text-xs text-gray-500">{weather.temp_min}°C</div>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-blue-600">
-                          {weather.temp_max}°
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm">
+                          <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                          </svg>
+                          <span className="text-gray-700 font-medium">{weather.condition}</span>
                         </div>
-                        <div className="text-xs text-gray-500">{weather.temp_min}°C</div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M5.5 16a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 16h-8z"/>
+                          </svg>
+                          <span>{language === "en" ? "Rain" : "Mưa"}: {weather.rain_chance}%</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/>
+                          </svg>
+                          <span>{language === "en" ? "Humidity" : "Độ ẩm"}: {weather.humidity}%</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm">
-                        <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
-                        </svg>
-                        <span className="text-gray-700 font-medium">{weather.condition}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M5.5 16a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 16h-8z"/>
-                        </svg>
-                        <span>{language === "en" ? "Rain" : "Mưa"}: {weather.rain_chance}%</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/>
-                        </svg>
-                        <span>{language === "en" ? "Humidity" : "Độ ẩm"}: {weather.humidity}%</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* Schedule Section */}
-        <div className="mt-12 grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {currentDay ? (
+          <div className="mt-12 grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Day Selector Sidebar */}
           <div className="lg:col-span-1">
             <div className="card bg-white shadow-lg sticky top-24 mobile-compact">
@@ -773,6 +1195,68 @@ export default function TripPlanPage() {
                 </div>
               </div>
             </div>
+
+            {/* Route Table (drag & drop) */}
+            {currentDay && (
+              <div className="mt-4">
+                <div className="card bg-white shadow-lg mobile-compact">
+                  <div className="card-body p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                      </svg>
+                      <h3 className="text-base font-bold text-gray-800">{language === "en" ? "Route" : "Lộ trình"}</h3>
+                    </div>
+                    <div className="text-xs text-gray-500 mb-2">{t("plan.dragToReorder")}</div>
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRouteDragEnd}>
+                      <SortableContext
+                        items={currentDay.activities
+                          .map((a) => a.client_id)
+                          .filter((id): id is string => Boolean(id))
+                          .map((id) => `route:${id}`)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-1">
+                          {currentDay.activities.map((a, activityIdx) =>
+                            a.client_id ? (
+                            <button
+                              key={a.client_id}
+                              type="button"
+                              className="w-full text-left"
+                              onClick={() => {
+                                if (!currentDay) return;
+                                // Map indexes are based on the subset of activities that have coordinates.
+                                const activityIdxWithCoords = currentDay.activities
+                                  .map((act, actIdx) =>
+                                    act.place_details?.lat && act.place_details?.lng ? actIdx : null
+                                  )
+                                  .filter((v): v is number => v !== null);
+
+                                const endLocIdx = activityIdxWithCoords.indexOf(activityIdx);
+                                if (endLocIdx === -1) return;
+
+                                // Clicking location 1 (first routable point) shows the full route.
+                                if (endLocIdx === 0) {
+                                  setActiveRouteSegmentStartIndex(null);
+                                  return;
+                                }
+
+                                // Clicking location N shows segment (N-1) -> N.
+                                setActiveRouteSegmentStartIndex(endLocIdx - 1);
+                              }}
+                              title="Xem tuyến"
+                            >
+                              <SortableRouteItem id={`route:${a.client_id!}`} index={activityIdx} label={a.place} />
+                            </button>
+                            ) : null
+                          )}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Items and Tips boxes - directly under Schedule */}
             <div className="mt-4 space-y-4">
@@ -829,25 +1313,59 @@ export default function TripPlanPage() {
               <div className="mb-6">
                 <div className="card bg-white shadow-lg mobile-compact">
                   <div className="card-body p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                      </svg>
-                      <h3 className="text-lg font-bold text-gray-800 mobile-heading">
-                        {language === "en" ? "Route Map" : "Bản đồ lộ trình"}
-                      </h3>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        </svg>
+                        <h3 className="text-lg font-bold text-gray-800 mobile-heading">
+                          {language === "en" ? "Route Map" : "Bản đồ lộ trình"}
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => setIsRouteMapCollapsed(!isRouteMapCollapsed)}
+                        className="btn btn-xs btn-ghost"
+                        title={isRouteMapCollapsed ? "Mở rộng" : "Thu gọn"}
+                      >
+                        <svg className={`w-5 h-5 transition-transform ${isRouteMapCollapsed ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
                     </div>
+                    {!isRouteMapCollapsed && (
                     <RouteMap
-                      locations={currentDay.activities
-                        .filter(a => a.place_details?.lat && a.place_details?.lng)
-                        .map(a => ({
-                          lat: a.place_details!.lat,
-                          lng: a.place_details!.lng,
-                          name: a.place,
-                          time: a.time,
-                        }))}
+                      locations={currentDay.activities.reduce(
+                        (acc, a, idx) => {
+                          const lat = a.place_details?.lat;
+                          const lng = a.place_details?.lng;
+                          if (typeof lat === "number" && typeof lng === "number" && lat !== 0 && lng !== 0) {
+                            acc.push({
+                              lat,
+                              lng,
+                              name: a.place,
+                              time: a.time,
+                              seq: idx + 1,
+                            });
+                          }
+                          return acc;
+                        },
+                        [] as { lat: number; lng: number; name: string; time?: string; seq?: number }[]
+                      )}
+                      activeSegmentStartIndex={activeRouteSegmentStartIndex}
+                      onLocationClick={(idx) => {
+                        // Clicking marker 1 shows the full route.
+                        if (idx === 0) {
+                          setActiveRouteSegmentStartIndex(null);
+                          return;
+                        }
+
+                        // Clicking marker N shows segment (N-1) -> N.
+                        setActiveRouteSegmentStartIndex(idx - 1);
+                      }}
+                      travelMode={tripParams?.travel_mode}
                       height="350px"
                     />
+                    )}
                   </div>
                 </div>
               </div>
@@ -856,52 +1374,115 @@ export default function TripPlanPage() {
             {currentDay && (
               <div>
                 <div className="mb-6">
-                  <h2 className="text-2xl font-bold mb-2 mobile-heading">
-                    {language === "en" ? `Day ${currentDay.day}` : `Ngày ${currentDay.day}`}
-                  </h2>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <h2 className="text-2xl font-bold mobile-heading">
+                      {language === "en" ? `Day ${currentDay.day}` : `Ngày ${currentDay.day}`}
+                    </h2>
+                    <div className="badge badge-outline font-bold text-blue-700 border-blue-700">
+                      {language === "en"
+                        ? `Total cost: ${formatVndNumber(
+                            currentDay.activities.reduce(
+                              (acc, a) => acc + vndMidpoint(a.estimated_cost),
+                              0
+                            )
+                          )} đ`
+                        : `Tổng chi phí: ${formatVndNumber(
+                            currentDay.activities.reduce(
+                              (acc, a) => acc + vndMidpoint(a.estimated_cost),
+                              0
+                            )
+                          )} đ`}
+                    </div>
+                  </div>
                   <div className="divider"></div>
                 </div>
 
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext
-                    items={currentDay.activities.map((_, idx) => {
-                      const dayIndex = tripPlan.days.findIndex(
-                        (d) => d.day === selectedDay
-                      );
-                      return `${dayIndex}-${idx}`;
-                    })}
+                    items={currentDay.activities
+                      .map((a) => a.client_id)
+                      .filter((id): id is string => Boolean(id))}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className="space-y-6">
                       {currentDay.activities.map((activity, activityIdx) => {
-                        const dayIndex = tripPlan.days.findIndex(
-                          (d) => d.day === selectedDay
-                        );
+                        const dayIndex = tripPlan.days.findIndex((d) => d.day === selectedDay);
                         const isEditing =
                           editingActivity?.dayIndex === dayIndex &&
                           editingActivity?.activityIndex === activityIdx;
 
                         return (
-                          <SortableActivity
-                            key={`${dayIndex}-${activityIdx}`}
-                            activity={activity}
-                            activityIdx={activityIdx}
-                            dayIndex={dayIndex}
-                            isEditing={isEditing}
-                            onEdit={(field, value) =>
-                              handleEditActivity(dayIndex, activityIdx, field, value)
-                            }
-                            onStartEdit={() =>
-                              setEditingActivity({ dayIndex, activityIndex: activityIdx })
-                            }
-                            onFinishEdit={() => setEditingActivity(null)}
-                            onDelete={() => handleDeleteActivity(dayIndex, activityIdx)}
-                            t={t}
-                          />
+                          <div key={activity.client_id || `${dayIndex}-${activityIdx}`} className="group">
+                            {/* Hover Insert/Delete Controls */}
+                            {!isTimeEditOpen && (
+                              <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity my-2 relative z-20">
+                                <div className="flex-1 h-px bg-gray-200"></div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleInsertActivity(dayIndex, activityIdx, "above")}
+                                    className="btn btn-xs btn-circle btn-primary"
+                                    title="Thêm chuyến đi"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m7-7H5" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteActivity(dayIndex, activityIdx)}
+                                    className="btn btn-xs btn-circle btn-outline btn-ghost text-red-600 border-red-300"
+                                    title="Xoá"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2 0V5a2 2 0 012-2h2a2 2 0 012 2v2" />
+                                    </svg>
+                                  </button>
+                                </div>
+                                <div className="flex-1 h-px bg-gray-200"></div>
+                              </div>
+                            )}
+
+                            <SortableActivity
+                              id={activity.client_id!}
+                              activity={activity}
+                              activityIdx={activityIdx}
+                              dayIndex={dayIndex}
+                              isEditing={isEditing}
+                              isModalOpen={isTimeEditOpen}
+                              onEdit={(field, value) =>
+                                handleEditActivity(dayIndex, activityIdx, field, value)
+                              }
+                              onOpenTimeEdit={(currentTime) =>
+                                openTimeEdit(dayIndex, activityIdx, currentTime)
+                              }
+                              onStartEdit={() =>
+                                setEditingActivity({ dayIndex, activityIndex: activityIdx })
+                              }
+                              onFinishEdit={() => setEditingActivity(null)}
+                              onDelete={() => handleDeleteActivity(dayIndex, activityIdx)}
+                              onResolvePlace={(q) => handleResolvePlace(dayIndex, activityIdx, q)}
+                              isResolving={Boolean(activity.client_id && resolvingActivityIds[activity.client_id])}
+                              t={t}
+                            />
+
+                            {/* Insert Below Button (only show for last item) */}
+                            {activityIdx === currentDay.activities.length - 1 && (
+                              !isTimeEditOpen && (
+                                <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity my-2 relative z-20">
+                                  <div className="flex-1 h-px bg-gray-200"></div>
+                                  <button
+                                    onClick={() => handleInsertActivity(dayIndex, activityIdx, "below")}
+                                    className="btn btn-xs btn-circle btn-primary"
+                                    title="Thêm chuyến đi"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m7-7H5" />
+                                    </svg>
+                                  </button>
+                                  <div className="flex-1 h-px bg-gray-200"></div>
+                                </div>
+                              )
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -911,8 +1492,63 @@ export default function TripPlanPage() {
             )}
           </div>
         </div>
-
-
+        ) : (
+          <div className="mt-12 grid grid-cols-1 lg:grid-cols-5 gap-6" />
+        )}
+        {/* Time edit modal rendered at page level to avoid Leaflet/DnD stacking context issues */}
+        {isTimeEditOpen && timeEditTarget && (
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[999999]"
+            role="dialog"
+            aria-modal="true"
+            onClick={closeTimeEdit}
+          >
+            <div
+              className="bg-white rounded-lg shadow-xl p-5 max-w-sm w-full mx-4 pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 className="text-lg font-bold">Chỉnh sửa thời gian</h3>
+              </div>
+              <input
+                type="text"
+                className="input input-bordered input-sm w-full mb-4"
+                placeholder="VD: 08:00 - 10:00"
+                value={timeEditInput}
+                onChange={(e) => setTimeEditInput(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleEditActivity(timeEditTarget.dayIndex, timeEditTarget.activityIndex, "time", timeEditInput);
+                    closeTimeEdit();
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    closeTimeEdit();
+                  }
+                }}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => {
+                    handleEditActivity(timeEditTarget.dayIndex, timeEditTarget.activityIndex, "time", timeEditInput);
+                    closeTimeEdit();
+                  }}
+                >
+                  Lưu
+                </button>
+                <button className="btn btn-sm btn-outline btn-primary" onClick={closeTimeEdit}>
+                  Huỷ
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

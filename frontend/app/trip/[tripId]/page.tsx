@@ -7,12 +7,6 @@ import { useAuth } from "../../../contexts/AuthContext";
 import StarRating from "../../../components/StarRating";
 import dynamic from "next/dynamic";
 
-// Dynamic import for RouteMap to avoid SSR issues
-const RouteMap = dynamic(() => import("../../../components/RouteMap"), {
-  ssr: false,
-  loading: () => <div className="h-96 bg-gray-200 rounded-lg animate-pulse"></div>,
-});
-
 import {
   DndContext,
   closestCenter,
@@ -30,6 +24,15 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+// Dynamic import for RouteMap to avoid SSR issues
+const RouteMap = dynamic(() => import("../../../components/RouteMap"), {
+  ssr: false,
+  loading: () => <div className="h-96 bg-gray-200 rounded-lg animate-pulse"></div>,
+});
+
+// NOTE: Trip detail is read-only; no drag-and-drop editing.
+// UPDATED: Trip detail supports drag-and-drop reordering within a day.
 
 // Format date as dd/mm/yyyy
 const formatDate = (dateString: string): string => {
@@ -130,6 +133,7 @@ interface PlaceDetails {
 }
 
 interface Activity {
+  client_id?: string;
   time: string;
   place: string;
   description: string;
@@ -176,88 +180,183 @@ interface TripData {
   trip_plan: TripPlan;
   created_at: string;
   activity_level?: string;
+  travel_mode?: string;
   is_public?: boolean;
   category_tags?: string[];
 }
 
-// Sortable Activity Item Component
-function SortableActivity({ activity, id, language }: { activity: Activity; id: string; language: string }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
-  const style = { transform: CSS.Transform.toString(transform), transition };
+function newClientId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return (crypto as any).randomUUID();
+  }
+  return `cid_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function ensureActivityIds(plan: TripPlan): TripPlan {
+  let changed = false;
+  const days = (plan.days || []).map((day) => {
+    const activities = (day.activities || []).map((activity) => {
+      if (activity.client_id) return activity;
+      changed = true;
+      return { ...activity, client_id: newClientId() };
+    });
+    return { ...day, activities };
+  });
+  if (!changed) return plan;
+  return { ...plan, days };
+}
+
+function formatVndNumber(amount: number) {
+  try {
+    return new Intl.NumberFormat("vi-VN").format(Math.round(amount));
+  } catch {
+    return String(Math.round(amount));
+  }
+}
+
+function vndMidpoint(vndText: string) {
+  if (!vndText) return 0;
+  const lower = vndText.toLowerCase();
+  if (lower.includes("free") || lower.includes("miễn")) return 0;
+  const normalized = vndText.replace(/\./g, "").replace(/,/g, "");
+  const nums = normalized.match(/\d+/g) || [];
+  if (nums.length === 0) return 0;
+  const values = nums.map((n) => Number(n)).filter((n) => Number.isFinite(n));
+  if (values.length === 0) return 0;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return (min + max) / 2;
+}
+
+function SortableActivityCard({
+  id,
+  activity,
+  language,
+  isModalOpen,
+  onOpenTimeEdit,
+}: {
+  id: string;
+  activity: Activity;
+  language: string;
+  isModalOpen: boolean;
+  onOpenTimeEdit: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled: isModalOpen });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="cursor-move">
-      <div className="card bg-white shadow-md hover:shadow-lg transition-all mb-4">
-        <div className="card-body p-4">
-          <div className="flex gap-4">
-            {activity.place_details?.photo_url && (
-              <div className="avatar">
-                <div className="w-20 h-20 rounded-lg">
-                  <img src={activity.place_details.photo_url} alt={activity.place} />
+    <div ref={setNodeRef} style={style} className="card bg-white shadow-md hover:shadow-lg transition-all">
+      <div className="card-body p-4">
+        <div className="flex gap-4">
+          <div
+            {...attributes}
+            {...listeners}
+            className="cursor-move text-gray-400 hover:text-gray-600 pt-1 touch-none select-none"
+            title={language === "en" ? "Drag to reorder" : "Kéo để sắp xếp"}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+            </svg>
+          </div>
+
+          {activity.place_details?.photo_url && (
+            <div className="avatar">
+              <div className="w-20 h-20 rounded-lg">
+                <img src={activity.place_details.photo_url} alt={activity.place} />
+              </div>
+            </div>
+          )}
+
+          <div className="flex-1">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-primary mb-1"
+                  title={language === "en" ? "Edit time" : "Chỉnh sửa thời gian"}
+                  onClick={onOpenTimeEdit}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {activity.time}
+                </button>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-lg">{activity.place}</h4>
+                  {activity.place_details?.google_maps_link && (
+                    <a
+                      href={activity.place_details.google_maps_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-circle btn-xs btn-ghost text-blue-600 hover:bg-blue-100 hover:text-blue-800"
+                      title="Mở trong Google Maps"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+                      </svg>
+                    </a>
+                  )}
                 </div>
+                {activity.place_details?.address && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {activity.place_details.address}
+                  </p>
+                )}
+                {activity.place_details && activity.place_details.rating > 0 && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <div className="rating rating-sm">
+                      {[...Array(5)].map((_, i) => (
+                        <input
+                          key={i}
+                          type="radio"
+                          className="mask mask-star-2 bg-orange-400"
+                          checked={i < Math.round(activity.place_details!.rating)}
+                          readOnly
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm text-gray-600">
+                      {activity.place_details.rating.toFixed(1)} ({activity.place_details.total_ratings})
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full whitespace-nowrap">
+                {formatPrice(activity.estimated_cost)}
+              </div>
+            </div>
+
+            <p className="text-gray-700 text-sm mb-2">{activity.description}</p>
+            {activity.tips && (
+              <div className="alert alert-info py-2 text-xs">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span>{activity.tips}</span>
               </div>
             )}
-            <div className="flex-1">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <div className="badge badge-primary badge-sm mb-1">{activity.time}</div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-bold text-lg">{activity.place}</h4>
-                    {activity.place_details?.google_maps_link && (
-                      <a
-                        href={activity.place_details.google_maps_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-circle btn-xs btn-ghost text-blue-600 hover:bg-blue-100 hover:text-blue-800"
-                        title="Mở trong Google Maps"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                        </svg>
-                      </a>
-                    )}
-                  </div>
-                  {activity.place_details?.address && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      {activity.place_details.address}
-                    </p>
-                  )}
-                  {activity.place_details && activity.place_details.rating > 0 && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <div className="rating rating-sm">
-                        {[...Array(5)].map((_, i) => (
-                          <input
-                            key={i}
-                            type="radio"
-                            className="mask mask-star-2 bg-orange-400"
-                            checked={i < Math.round(activity.place_details!.rating)}
-                            readOnly
-                          />
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600">
-                        {activity.place_details.rating.toFixed(1)} ({activity.place_details.total_ratings})
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full whitespace-nowrap">{formatPrice(activity.estimated_cost)}</div>
-              </div>
-              <p className="text-gray-700 text-sm mb-2">{activity.description}</p>
-              {activity.tips && (
-                <div className="alert alert-info py-2 text-xs">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                  <span>{activity.tips}</span>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -285,8 +384,14 @@ export default function TripDetailPage() {
   const [podcastGenerating, setPodcastGenerating] = useState(false);
   const [podcastUrl, setPodcastUrl] = useState<string | null>(null);
 
+  const [collapsedRouteMaps, setCollapsedRouteMaps] = useState<Record<number, boolean>>({});
+
+  const [isTimeEditOpen, setIsTimeEditOpen] = useState(false);
+  const [timeEditTarget, setTimeEditTarget] = useState<{ dayIndex: number; activityIndex: number } | null>(null);
+  const [timeEditInput, setTimeEditInput] = useState("");
+
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -325,11 +430,16 @@ export default function TripDetailPage() {
         
         setTripData(data);
         // Ensure tripPlan has cover_image
-        const planWithCover = { ...data.trip_plan, cover_image: coverImage };
+        const planWithCover = ensureActivityIds({ ...data.trip_plan, cover_image: coverImage });
         setTripPlan(planWithCover);
         setRating(data.rating || 0);
         setCoverImageUrl(coverImage);
         setCoverImageLoaded(false);
+        
+        // Load saved podcast URL if exists
+        if (data.podcast_url) {
+          setPodcastUrl(data.podcast_url);
+        }
         
         // Extract weather data if available
         if (data.weather) {
@@ -346,6 +456,15 @@ export default function TripDetailPage() {
       fetchTrip();
     }
   }, [user, tripId, getIdToken]);
+
+  useEffect(() => {
+    if (!isTimeEditOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isTimeEditOpen]);
 
   const handleRatingChange = async (newRating: number) => {
     if (!user || !tripId || ratingUpdating) return;
@@ -413,21 +532,46 @@ export default function TripDetailPage() {
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent, dayIndex: number) => {
+  const handleEditTime = (dayIndex: number, activityIndex: number, nextTime: string) => {
+    if (!tripPlan) return;
+    const newDays = [...tripPlan.days];
+    const day = newDays[dayIndex];
+    const newActivities = [...day.activities];
+    newActivities[activityIndex] = { ...newActivities[activityIndex], time: nextTime };
+    newDays[dayIndex] = { ...day, activities: newActivities };
+    setTripPlan({ ...tripPlan, days: newDays });
+  };
+
+  const openTimeEdit = (dayIndex: number, activityIndex: number) => {
+    if (!tripPlan) return;
+    const current = tripPlan.days?.[dayIndex]?.activities?.[activityIndex];
+    if (!current) return;
+    setTimeEditTarget({ dayIndex, activityIndex });
+    setTimeEditInput(current.time || "");
+    setIsTimeEditOpen(true);
+  };
+
+  const closeTimeEdit = () => {
+    setIsTimeEditOpen(false);
+    setTimeEditTarget(null);
+    setTimeEditInput("");
+  };
+
+  const handleDragEndForDay = (dayIndex: number) => (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || !tripPlan) return;
+    if (!over || active.id === over.id || !tripPlan) return;
 
-    if (active.id !== over.id) {
-      const day = tripPlan.days[dayIndex];
-      const oldIndex = day.activities.findIndex((_, idx) => `${dayIndex}-${idx}` === active.id);
-      const newIndex = day.activities.findIndex((_, idx) => `${dayIndex}-${idx}` === over.id);
+    const currentActivities = tripPlan.days?.[dayIndex]?.activities || [];
+    const oldIndex = currentActivities.findIndex((a) => a.client_id === String(active.id));
+    const newIndex = currentActivities.findIndex((a) => a.client_id === String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
 
-      const newActivities = arrayMove(day.activities, oldIndex, newIndex);
-      const newDays = [...tripPlan.days];
-      newDays[dayIndex] = { ...day, activities: newActivities };
-
-      setTripPlan({ ...tripPlan, days: newDays });
-    }
+    const newPlan = { ...tripPlan, days: [...tripPlan.days] };
+    newPlan.days[dayIndex] = {
+      ...newPlan.days[dayIndex],
+      activities: arrayMove(currentActivities, oldIndex, newIndex),
+    };
+    setTripPlan(newPlan);
   };
 
   const handleUpdateCoverImage = async () => {
@@ -500,6 +644,9 @@ export default function TripDetailPage() {
           </h1>
         </div>
         <div className="navbar-end">
+          <a href={`/trip/${tripId}/edit-plan`} className="btn btn-primary btn-sm">
+            {language === "en" ? "Edit plan" : "Sửa kế hoạch"}
+          </a>
         </div>
       </div>
 
@@ -669,31 +816,53 @@ export default function TripDetailPage() {
                       {language === "en" ? "Travel Podcast" : "Podcast du lịch"}
                     </span>
                   </div>
-                  <button
-                    onClick={handleGeneratePodcast}
-                    disabled={podcastGenerating}
-                    className="btn btn-sm btn-outline btn-purple w-full gap-2 mb-2 tap-target"
-                  >
-                    {podcastGenerating ? (
-                      <>
-                        <span className="loading loading-spinner loading-xs"></span>
-                        {language === "en" ? "Generating..." : "Đang tạo..."}
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        {language === "en" ? "Generate" : "Tạo podcast"}
-                      </>
-                    )}
-                  </button>
-                  {podcastUrl && (
-                    <div className="mt-2">
-                      <audio controls className="w-full">
-                        <source src={podcastUrl} type="audio/mpeg" />
-                      </audio>
-                    </div>
+                  {podcastUrl ? (
+                    <>
+                      <div className="mt-3 mb-3">
+                        <audio controls className="w-full rounded-lg">
+                          <source src={podcastUrl} type="audio/mpeg" />
+                        </audio>
+                      </div>
+                      <button
+                        onClick={handleGeneratePodcast}
+                        disabled={podcastGenerating}
+                        className="btn btn-sm btn-ghost btn-outline w-full gap-2 tap-target text-xs"
+                      >
+                        {podcastGenerating ? (
+                          <>
+                            <span className="loading loading-spinner loading-xs"></span>
+                            {language === "en" ? "Regenerating..." : "Đang tạo lại..."}
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            {language === "en" ? "Regenerate" : "Tạo lại podcast"}
+                          </>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleGeneratePodcast}
+                      disabled={podcastGenerating}
+                      className="btn btn-sm btn-outline btn-purple w-full gap-2 mb-2 tap-target"
+                    >
+                      {podcastGenerating ? (
+                        <>
+                          <span className="loading loading-spinner loading-xs"></span>
+                          {language === "en" ? "Generating..." : "Đang tạo..."}
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          {language === "en" ? "Generate" : "Tạo podcast"}
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
 
@@ -793,8 +962,8 @@ export default function TripDetailPage() {
                           </div>
                           <div className="text-xs text-gray-600 mb-1">{weather.condition}</div>
                           <div className="flex gap-3 text-xs text-gray-600">
-                            <span>☔ {weather.rain_chance}%</span>
-                            <span>💧 {weather.humidity}%</span>
+                            <span>{language === "en" ? "Rain" : "Mưa"}: {weather.rain_chance}%</span>
+                            <span>{language === "en" ? "Humidity" : "Độ ẩm"}: {weather.humidity}%</span>
                           </div>
                         </div>
                       ))}
@@ -878,47 +1047,100 @@ export default function TripDetailPage() {
               {tripPlan.days?.map((day, dayIndex) => (
                 <div key={dayIndex} className="card bg-white shadow-xl mobile-compact">
                   <div className="card-body">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="badge badge-lg badge-primary px-4 py-3 text-lg font-bold">
-                        {language === "en" ? `Day ${day.day}` : `Ngày ${day.day}`}
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="badge badge-lg badge-primary px-4 py-3 text-lg font-bold">
+                          {language === "en" ? `Day ${day.day}` : `Ngày ${day.day}`}
+                        </div>
+                        <h3 className="text-xl font-bold mobile-heading truncate">{day.title}</h3>
                       </div>
-                      <h3 className="text-xl font-bold mobile-heading">{day.title}</h3>
+
+                      <div className="badge badge-outline border-blue-500 text-blue-600 font-semibold whitespace-nowrap">
+                        {language === "en" ? "Daily cost" : "Tổng chi phí"}: {formatVndNumber(
+                          (day.activities || []).reduce((sum, activity) => sum + vndMidpoint(activity.estimated_cost), 0)
+                        )} đ
+                      </div>
                     </div>
 
                     {/* Route Map for this day */}
                     {day.activities.some(a => a.place_details?.lat && a.place_details?.lng) && (
                       <div className="mb-4">
-                        <RouteMap
-                          locations={day.activities
-                            .filter(a => a.place_details?.lat && a.place_details?.lng)
-                            .map(a => ({
-                              lat: a.place_details!.lat,
-                              lng: a.place_details!.lng,
-                              name: a.place,
-                              time: a.time,
-                            }))}
-                          height="250px"
-                        />
+                        <div className="flex items-center justify-end mb-2">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={() =>
+                              setCollapsedRouteMaps((prev) => ({
+                                ...prev,
+                                [dayIndex]: !prev[dayIndex],
+                              }))
+                            }
+                            title={
+                              collapsedRouteMaps[dayIndex]
+                                ? (language === "en" ? "Show map" : "Hiện bản đồ")
+                                : (language === "en" ? "Hide map" : "Ẩn bản đồ")
+                            }
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              {collapsedRouteMaps[dayIndex] ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              )}
+                            </svg>
+                            {collapsedRouteMaps[dayIndex]
+                              ? (language === "en" ? "Show map" : "Hiện bản đồ")
+                              : (language === "en" ? "Hide map" : "Ẩn bản đồ")}
+                          </button>
+                        </div>
+
+                        {!collapsedRouteMaps[dayIndex] && (
+                          <RouteMap
+                            locations={day.activities.reduce(
+                              (acc, activity, idx) => {
+                                if (activity.place_details?.lat && activity.place_details?.lng) {
+                                  acc.push({
+                                    lat: activity.place_details.lat,
+                                    lng: activity.place_details.lng,
+                                    name: activity.place,
+                                    time: activity.time,
+                                    seq: idx + 1,
+                                  });
+                                }
+                                return acc;
+                              },
+                              [] as { lat: number; lng: number; name: string; time?: string; seq?: number }[]
+                            )}
+                            height="250px"
+                            travelMode={tripData.travel_mode}
+                          />
+                        )}
                       </div>
                     )}
 
                     <DndContext
                       sensors={sensors}
                       collisionDetection={closestCenter}
-                      onDragEnd={(event: DragEndEvent) => handleDragEnd(event, dayIndex)}
+                      onDragEnd={handleDragEndForDay(dayIndex)}
                     >
                       <SortableContext
-                        items={day.activities?.map((_, idx) => `${dayIndex}-${idx}`) || []}
+                        items={(day.activities || [])
+                          .map((a) => a.client_id)
+                          .filter((id): id is string => Boolean(id))}
                         strategy={verticalListSortingStrategy}
                       >
-                        {day.activities?.map((activity, actIdx) => (
-                          <SortableActivity
-                            key={`${dayIndex}-${actIdx}`}
-                            id={`${dayIndex}-${actIdx}`}
-                            activity={activity}
-                            language={language}
-                          />
-                        ))}
+                        <div className="space-y-3">
+                          {day.activities?.map((activity, actIdx) => (
+                            <SortableActivityCard
+                              key={activity.client_id || `${dayIndex}-${actIdx}`}
+                              id={activity.client_id || `${dayIndex}-${actIdx}`}
+                              activity={activity}
+                              language={language}
+                              isModalOpen={isTimeEditOpen}
+                              onOpenTimeEdit={() => openTimeEdit(dayIndex, actIdx)}
+                            />
+                          ))}
+                        </div>
                       </SortableContext>
                     </DndContext>
                   </div>
@@ -928,6 +1150,66 @@ export default function TripDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Time Edit Modal (page-level to avoid DnD/Leaflet stacking issues) */}
+      {isTimeEditOpen && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[999999] flex items-center justify-center"
+          onClick={closeTimeEdit}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl p-5 max-w-sm w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 className="text-lg font-bold">{language === "en" ? "Edit time" : "Chỉnh sửa thời gian"}</h3>
+            </div>
+            <div className="text-xs text-gray-500 mb-3">{language === "en" ? "Format: HH:mm - HH:mm" : "Định dạng: HH:mm - HH:mm"}</div>
+            <input
+              type="text"
+              className="input input-bordered input-sm w-full mb-4"
+              placeholder={language === "en" ? "e.g., 08:00 - 10:00" : "VD: 08:00 - 10:00"}
+              value={timeEditInput}
+              onChange={(e) => setTimeEditInput(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (timeEditTarget) {
+                    handleEditTime(timeEditTarget.dayIndex, timeEditTarget.activityIndex, timeEditInput);
+                  }
+                  closeTimeEdit();
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  closeTimeEdit();
+                }
+              }}
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => {
+                  if (timeEditTarget) {
+                    handleEditTime(timeEditTarget.dayIndex, timeEditTarget.activityIndex, timeEditInput);
+                  }
+                  closeTimeEdit();
+                }}
+              >
+                {language === "en" ? "Save" : "Lưu"}
+              </button>
+              <button className="btn btn-sm btn-outline btn-primary" onClick={closeTimeEdit}>
+                {language === "en" ? "Cancel" : "Huỷ"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cover Image Modal */}
       {showCoverImageModal && (

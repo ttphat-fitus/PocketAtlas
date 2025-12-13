@@ -3,10 +3,28 @@ import httpx
 import requests
 import re
 import asyncio
+import math
 from typing import Optional
 from urllib.parse import quote
 from core.config import GOOGLE_MAPS_API_KEY
 from services.weather import get_weather_forecast
+
+
+def _looks_like_hotel_query(place_name: str, place_type_hint: Optional[str] = None) -> bool:
+    hint = (place_type_hint or "").strip().lower()
+    if hint in ["lodging", "hotel"]:
+        return True
+    q = (place_name or "").lower()
+    return any(k in q for k in [
+        "hotel",
+        "khách sạn",
+        "khach san",
+        "resort",
+        "homestay",
+        "hostel",
+        "villa",
+        "motel",
+    ])
 
 
 async def async_geocode(address: str) -> dict:
@@ -40,7 +58,20 @@ def sanitize_place_name(s: str) -> str:
     return s
 
 
-def get_place_details(place_name: str, location: str) -> dict:
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Great-circle distance in kilometers."""
+    r = 6371.0
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lng2 - lng1)
+
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return r * c
+
+
+def get_place_details(place_name: str, location: str, place_type_hint: Optional[str] = None) -> dict:
     """Enhanced place details using Google Maps API with weather, photos, ratings, and more"""
     empty_result = {
         "name": place_name, "address": "", "rating": 0, "total_ratings": 0,
@@ -58,14 +89,24 @@ def get_place_details(place_name: str, location: str) -> dict:
         
         # Get location coordinates for bias
         location_bias = ""
+        bias_center = None
         try:
             geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
-            geocode_params = {"address": location, "key": GOOGLE_MAPS_API_KEY}
+            geocode_params = {
+                "address": location,
+                "key": GOOGLE_MAPS_API_KEY,
+                "language": "vi",
+                "region": "vn",
+                "components": "country:vn",
+            }
             geocode_resp = requests.get(geocode_url, params=geocode_params, timeout=5)
             geocode_data = geocode_resp.json()
             if geocode_data.get("results"):
                 geo_loc = geocode_data["results"][0]["geometry"]["location"]
-                location_bias = f"point:{geo_loc['lat']},{geo_loc['lng']}"
+                bias_center = (float(geo_loc.get("lat", 0)), float(geo_loc.get("lng", 0)))
+                if bias_center[0] and bias_center[1]:
+                    # Prefer a radius bias (helps avoid cross-city same-name branches)
+                    location_bias = f"circle:35000@{bias_center[0]},{bias_center[1]}"
         except:
             pass
         
@@ -74,8 +115,12 @@ def get_place_details(place_name: str, location: str) -> dict:
         search_params = {
             "query": f"{q} {location}",
             "key": GOOGLE_MAPS_API_KEY,
-            "language": "vi"
+            "language": "vi",
+            "region": "vn",
         }
+
+        if _looks_like_hotel_query(place_name, place_type_hint):
+            search_params["type"] = "lodging"
         
         if location_bias:
             search_params["locationbias"] = location_bias
@@ -86,8 +131,29 @@ def get_place_details(place_name: str, location: str) -> dict:
         if data.get("status") != "OK" or not data.get("results"):
             print(f"      Google Places API error: {data.get('status')}")
             return empty_result
-        
-        place = data["results"][0]
+
+        # Prefer the result closest to destination center (when available)
+        results = data.get("results", [])[:5]
+        place = results[0]
+        if bias_center and results:
+            best = None
+            best_dist = None
+            for cand in results:
+                cand_loc = cand.get("geometry", {}).get("location", {})
+                try:
+                    clat = float(cand_loc.get("lat", 0))
+                    clng = float(cand_loc.get("lng", 0))
+                except Exception:
+                    continue
+                if not clat or not clng:
+                    continue
+                d = _haversine_km(bias_center[0], bias_center[1], clat, clng)
+                if best is None or (best_dist is not None and d < best_dist):
+                    best = cand
+                    best_dist = d
+            if best is not None:
+                place = best
+
         place_id = place.get("place_id")
         location_data = place.get("geometry", {}).get("location", {})
         lat = float(location_data.get("lat", 0))
@@ -105,6 +171,16 @@ def get_place_details(place_name: str, location: str) -> dict:
         details_resp = requests.get(details_url, params=details_params, timeout=10, headers=headers)
         details_data = details_resp.json()
         place_details = details_data.get("result", place) if details_data.get("status") == "OK" else place
+
+        # Prefer the precise geometry from Place Details (Text Search can be less accurate)
+        try:
+            details_loc = place_details.get("geometry", {}).get("location", {})
+            dlat = float(details_loc.get("lat", 0)) if details_loc.get("lat") is not None else 0
+            dlng = float(details_loc.get("lng", 0)) if details_loc.get("lng") is not None else 0
+            if dlat and dlng:
+                lat, lng = dlat, dlng
+        except Exception:
+            pass
         
         # Extract photo URL
         photo_url = ""
@@ -135,8 +211,12 @@ def get_place_details(place_name: str, location: str) -> dict:
         
         # Check if hotel and generate Booking.com link
         place_types = place_details.get("types", [])
-        is_hotel = any(t in place_types for t in ["lodging", "hotel", "resort", "guest_house", "motel"])
-        booking_link = f"https://www.booking.com/searchresults.html?ss={quote(place_details.get('name', place_name) + ' ' + location)}" if is_hotel else ""
+        is_hotel = any(t in place_types for t in ["lodging", "hotel", "resort", "guest_house", "motel"]) or _looks_like_hotel_query(place_name, place_type_hint)
+        booking_link = (
+            f"https://www.booking.com/searchresults.html?ss={quote(place_details.get('name', place_name) + ' ' + location)}"
+            if is_hotel
+            else ""
+        )
         
         return {
             "name": place_details.get("name", place_name),
@@ -163,7 +243,7 @@ def get_place_details(place_name: str, location: str) -> dict:
         return empty_result
 
 
-async def get_place_details_async(place_name: str, location: str, location_coords: dict = None) -> dict:
+async def get_place_details_async(place_name: str, location: str, location_coords: dict = None, place_type_hint: Optional[str] = None) -> dict:
     """Async version of get_place_details"""
     empty_result = {
         "name": place_name, "address": "", "rating": 0, "total_ratings": 0,
@@ -179,17 +259,28 @@ async def get_place_details_async(place_name: str, location: str, location_coord
         
         async with httpx.AsyncClient(timeout=15) as client:
             location_bias = ""
+            bias_center = None
             if location_coords and location_coords.get("lat"):
-                location_bias = f"point:{location_coords['lat']},{location_coords['lng']}"
+                bias_center = (float(location_coords.get("lat", 0)), float(location_coords.get("lng", 0)))
+                if bias_center[0] and bias_center[1]:
+                    location_bias = f"circle:35000@{bias_center[0]},{bias_center[1]}"
             else:
                 try:
                     geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
-                    geocode_params = {"address": location, "key": GOOGLE_MAPS_API_KEY}
+                    geocode_params = {
+                        "address": location,
+                        "key": GOOGLE_MAPS_API_KEY,
+                        "language": "vi",
+                        "region": "vn",
+                        "components": "country:vn",
+                    }
                     geocode_resp = await client.get(geocode_url, params=geocode_params)
                     geocode_data = geocode_resp.json()
                     if geocode_data.get("results"):
                         geo_loc = geocode_data["results"][0]["geometry"]["location"]
-                        location_bias = f"point:{geo_loc['lat']},{geo_loc['lng']}"
+                        bias_center = (float(geo_loc.get("lat", 0)), float(geo_loc.get("lng", 0)))
+                        if bias_center[0] and bias_center[1]:
+                            location_bias = f"circle:35000@{bias_center[0]},{bias_center[1]}"
                 except:
                     pass
             
@@ -197,18 +288,42 @@ async def get_place_details_async(place_name: str, location: str, location_coord
             search_params = {
                 "query": f"{q} {location}",
                 "key": GOOGLE_MAPS_API_KEY,
-                "language": "vi"
+                "language": "vi",
+                "region": "vn",
             }
             if location_bias:
                 search_params["locationbias"] = location_bias
+
+            if _looks_like_hotel_query(place_name, place_type_hint):
+                search_params["type"] = "lodging"
             
             resp = await client.get(search_url, params=search_params)
             data = resp.json()
             
             if data.get("status") != "OK" or not data.get("results"):
                 return empty_result
-            
-            place = data["results"][0]
+
+            results = data.get("results", [])[:5]
+            place = results[0]
+            if bias_center and results:
+                best = None
+                best_dist = None
+                for cand in results:
+                    cand_loc = cand.get("geometry", {}).get("location", {})
+                    try:
+                        clat = float(cand_loc.get("lat", 0))
+                        clng = float(cand_loc.get("lng", 0))
+                    except Exception:
+                        continue
+                    if not clat or not clng:
+                        continue
+                    d = _haversine_km(bias_center[0], bias_center[1], clat, clng)
+                    if best is None or (best_dist is not None and d < best_dist):
+                        best = cand
+                        best_dist = d
+                if best is not None:
+                    place = best
+
             place_id = place.get("place_id")
             location_data = place.get("geometry", {}).get("location", {})
             lat = float(location_data.get("lat", 0))
@@ -225,6 +340,16 @@ async def get_place_details_async(place_name: str, location: str, location_coord
             details_resp = await client.get(details_url, params=details_params)
             details_data = details_resp.json()
             place_details = details_data.get("result", place) if details_data.get("status") == "OK" else place
+
+        # Prefer the precise geometry from Place Details (Text Search can be less accurate)
+        try:
+            details_loc = place_details.get("geometry", {}).get("location", {})
+            dlat = float(details_loc.get("lat", 0)) if details_loc.get("lat") is not None else 0
+            dlng = float(details_loc.get("lng", 0)) if details_loc.get("lng") is not None else 0
+            if dlat and dlng:
+                lat, lng = dlat, dlng
+        except Exception:
+            pass
         
         photo_url = ""
         photos = place_details.get("photos", [])
@@ -246,8 +371,12 @@ async def get_place_details_async(place_name: str, location: str, location_coord
         google_maps_link = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}&query_place_id={place_id}" if lat != 0 else ""
         
         place_types = place_details.get("types", [])
-        is_hotel = any(t in place_types for t in ["lodging", "hotel", "resort", "guest_house", "motel"])
-        booking_link = f"https://www.booking.com/searchresults.html?ss={quote(place_details.get('name', place_name) + ' ' + location)}" if is_hotel else ""
+        is_hotel = any(t in place_types for t in ["lodging", "hotel", "resort", "guest_house", "motel"]) or _looks_like_hotel_query(place_name, place_type_hint)
+        booking_link = (
+            f"https://www.booking.com/searchresults.html?ss={quote(place_details.get('name', place_name) + ' ' + location)}"
+            if is_hotel
+            else ""
+        )
         
         return {
             "name": place_details.get("name", place_name),
@@ -277,6 +406,26 @@ async def get_place_details_async(place_name: str, location: str, location_coord
 async def enrich_activities_parallel(trip_plan: dict, destination: str, batch_size: int = 5) -> dict:
     """Enrich all activities with place details in parallel batches"""
     location_coords = await async_geocode(destination)
+
+    empty_result = {
+        "name": "",
+        "address": "",
+        "rating": 0,
+        "total_ratings": 0,
+        "photo_url": "",
+        "lat": 0,
+        "lng": 0,
+        "types": [],
+        "price_level": 0,
+        "weather": {"forecasts": []},
+        "phone": "",
+        "website": "",
+        "opening_hours": [],
+        "reviews": [],
+        "google_maps_link": "",
+        "booking_link": "",
+        "is_hotel": False,
+    }
     
     all_activities = []
     for day in trip_plan.get("days", []):

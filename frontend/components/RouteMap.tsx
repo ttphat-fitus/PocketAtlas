@@ -7,12 +7,16 @@ interface Location {
   lng: number;
   name: string;
   time?: string;
+  seq?: number;
 }
 
 interface RouteMapProps {
   locations: Location[];
   showRoute?: boolean;
   height?: string;
+  activeSegmentStartIndex?: number | null;
+  onLocationClick?: (index: number) => void;
+  travelMode?: string;
 }
 
 // Dynamically import LeafletMap (client-side only, no SSR)
@@ -25,12 +29,22 @@ const LeafletMap = dynamic(() => import("./LeafletMap"), {
   )
 });
 
-export default function RouteMap({ locations, showRoute = true, height = "400px" }: RouteMapProps) {
+export default function RouteMap({
+  locations,
+  showRoute = true,
+  height = "400px",
+  activeSegmentStartIndex = null,
+  onLocationClick,
+  travelMode,
+}: RouteMapProps) {
   return (
     <LeafletMap 
       locations={locations} 
       showRoute={showRoute} 
       height={height} 
+      activeSegmentStartIndex={activeSegmentStartIndex}
+      onLocationClick={onLocationClick}
+      travelMode={travelMode}
     />
   );
 }

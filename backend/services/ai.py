@@ -44,6 +44,8 @@ THÔNG TIN CHUYẾN ĐI:
 • Ngân sách: {budget_desc}
 • Mức độ hoạt động: {activity_desc}
 • Nhóm du lịch: {group_desc}
+• Quy mô nhóm: {trip_request.group_size if trip_request.group_size else "Không chỉ định"}
+• Cách du lịch/Phương tiện: {trip_request.travel_mode if trip_request.travel_mode else "Không chỉ định"}
 • Danh mục ưu tiên: {categories_text}
 • Thời gian hoạt động: {str(trip_request.active_time_start).zfill(2)}:00 - {str(trip_request.active_time_end).zfill(2)}:00
 • Sở thích khác: {trip_request.preferences if trip_request.preferences else "Không có yêu cầu đặc biệt"}
@@ -59,6 +61,8 @@ YÊU CẦU QUAN TRỌNG:
 2. **Thời gian hợp lý**: 
    - Bắt đầu từ 7:00-8:00, kết thúc 20:00-21:00
    - Mỗi hoạt động từ 1.5-3 giờ
+  - LUÔN chừa thời gian di chuyển/nghỉ giữa 2 hoạt động liên tiếp (tối thiểu 15-45 phút)
+  - KHÔNG được để thời gian kết thúc của hoạt động A trùng đúng thời gian bắt đầu của hoạt động B
 
 3. **Chi phí THỰC TẾ**:
    - Ngân sách LOW: 50.000-150.000 đ/hoạt động

@@ -11,9 +11,10 @@ from firebase import get_current_user, get_optional_user
 from core.database import db, firestore
 from core.config import model
 from models.trip import (TripRequest, RatingRequest, ViewRequest, 
-                         CoverImageRequest, TogglePublicRequest, LikeRequest)
+                         CoverImageRequest, TogglePublicRequest, LikeRequest, UpdateTripPlanRequest)
 from services.ai import create_trip_planning_prompt
 from services.maps import async_geocode, enrich_activities_parallel, generate_booking_link
+from services.schedule import apply_time_buffers
 from services.weather import get_weather_forecast_async
 from services.image import get_unsplash_image_async
 from services.podcast import podcast_service
@@ -50,6 +51,17 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         
         json_str = match.group(1) or match.group(2)
         trip_plan = json.loads(json_str)
+
+        # Enforce buffer time between consecutive activities (deterministic post-process)
+        try:
+            trip_plan = apply_time_buffers(
+                trip_plan,
+                active_time_start=getattr(trip_request, "active_time_start", None),
+                active_time_end=getattr(trip_request, "active_time_end", None),
+                travel_mode=getattr(trip_request, "travel_mode", None),
+            )
+        except Exception as e:
+            print(f"[WARN] Could not apply time buffers: {e}")
         
         # Get destination weather forecast with score and warning level
         destination_weather = []
@@ -275,6 +287,39 @@ async def update_trip_rating(trip_id: str, rating_request: RatingRequest, user =
         return JSONResponse(status_code=500, content={"error": "Failed to update rating", "details": str(e)})
 
 
+@router.put("/api/trip/{trip_id}/plan")
+async def update_trip_plan(trip_id: str, payload: UpdateTripPlanRequest, user = Depends(get_current_user)):
+    """Update trip plan (used by Create Plan save)."""
+    try:
+        trip_ref = db.collection("trips").document(trip_id)
+        trip_doc = trip_ref.get()
+
+        if not trip_doc.exists:
+            return JSONResponse(status_code=404, content={"error": "Trip not found"})
+
+        trip_data = trip_doc.to_dict()
+        if trip_data.get("user_id") != user["uid"]:
+            return JSONResponse(status_code=403, content={"error": "Not authorized"})
+
+        trip_plan = payload.trip_plan or {}
+        trip_name = None
+        if isinstance(trip_plan, dict):
+            trip_name = trip_plan.get("trip_name")
+
+        update_data = {
+            "trip_plan": trip_plan,
+            "updated_at": datetime.now().isoformat(),
+        }
+        if trip_name:
+            update_data["trip_name"] = trip_name
+
+        trip_ref.update(update_data)
+        return JSONResponse(content={"message": "Trip plan updated"})
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": "Failed to update trip plan", "details": str(e)})
+
+
 @router.put("/api/trip/{trip_id}/cover-image")
 async def update_trip_cover_image(trip_id: str, request: CoverImageRequest, user = Depends(get_current_user)):
     """Update trip cover image"""
@@ -429,3 +474,71 @@ async def get_podcast(trip_id: str):
         return JSONResponse(status_code=404, content={"success": False, "error": "Podcast not found"})
     except Exception as e:
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
+@router.post("/api/resolve-place")
+async def resolve_place(request: Request):
+    """Resolve a place name and return enriched details including cost, tips, location, and photo"""
+    try:
+        body = await request.json()
+        place_name = body.get("place_name", "").strip()
+        destination = body.get("destination", "").strip()
+        budget = body.get("budget", "medium")
+        location_coords = body.get("location_coords")
+        place_type_hint = body.get("place_type_hint")
+        
+        if not place_name:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "place_name is required"}
+            )
+        
+        if not destination:
+            destination = "Việt Nam"
+
+        from services.maps import get_place_details_async
+
+        place_info = await get_place_details_async(
+            place_name,
+            destination,
+            location_coords=location_coords,
+            place_type_hint=place_type_hint,
+        )
+        
+        # Estimate cost based on budget level
+        estimated_cost = "100.000 - 200.000 đ"
+        if budget == "low":
+            estimated_cost = "50.000 - 100.000 đ"
+        elif budget == "high":
+            estimated_cost = "500.000 - 1.000.000 đ"
+        
+        # If we got place details with price_level, adjust cost
+        if place_info.get("price_level"):
+            price_level = place_info["price_level"]
+            if price_level == 1:
+                estimated_cost = "50.000 - 150.000 đ"
+            elif price_level == 2:
+                estimated_cost = "150.000 - 400.000 đ"
+            elif price_level == 3:
+                estimated_cost = "400.000 - 800.000 đ"
+            elif price_level >= 4:
+                estimated_cost = "800.000 - 2.000.000 đ"
+        
+        tips = place_info.get("phone") or place_info.get("website") or "Check opening hours before visiting"
+        
+        return JSONResponse(
+            content={
+                "place": place_info.get("name", place_name),
+                "description": place_info.get("address", ""),
+                "estimated_cost": estimated_cost,
+                "tips": tips,
+                "place_details": place_info,
+            }
+        )
+    
+    except Exception as e:
+        print(f"Error resolving place: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to resolve place: {str(e)}"}
+        )

@@ -13,15 +13,21 @@ export default function LoadingScreen({ progress }: LoadingScreenProps) {
   const { t } = useLanguage();
 
   useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     const interval = setInterval(() => {
       setPlaneRotation((prev) => (prev + 1.5) % 360);
     }, 30);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      document.body.style.overflow = prevOverflow;
+    };
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-900 via-blue-800 to-teal-900 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-gradient-to-br from-blue-900 via-blue-800 to-teal-900 z-[999999] flex items-center justify-center pointer-events-auto">
       <div className="text-center">
         {/* Image-based 3D Earth and Plane */}
         <div className="relative mb-8 w-[350px] h-[350px] mx-auto">
