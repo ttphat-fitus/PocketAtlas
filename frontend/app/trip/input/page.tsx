@@ -145,7 +145,7 @@ export default function TripInputPage() {
   const router = useRouter();
   const { user, loading: authLoading, signInAnon, getIdToken } = useAuth();
 
-  const MAX_TRIP_DAYS = 7;
+  const MAX_TRIP_DAYS = 3;
   const MAX_TRIP_END_OFFSET = MAX_TRIP_DAYS - 1; // inclusive range
 
   const [destination, setDestination] = useState("");
@@ -846,7 +846,7 @@ export default function TripInputPage() {
                                 ? `${formatDisplayDate(
                                     journeyStart
                                   )} – ${formatDisplayDate(journeyEnd)}`
-                                : "Chọn tối đa 7 ngày"}
+                                : "Chọn tối đa 3 ngày"}
                             </div>
                             <button
                               type="button"
@@ -869,7 +869,7 @@ export default function TripInputPage() {
                   </div>
 
                   <div className="mt-2 text-xs text-slate-500">
-                    Thời gian tối đa: 7 ngày.
+                    Thời gian tối đa: 3 ngày.
                   </div>
                 </div>
               </div>
