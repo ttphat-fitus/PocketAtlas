@@ -465,7 +465,7 @@ Planning a trip to Southeast Asia? Here's your ultimate packing guide to ensure 
 
 ## Documents & Money
 
-✅ **Must-haves:**
+**Must-haves:**
 - Passport (6+ months validity)
 - Visa documents/e-visa printouts
 - Travel insurance papers
@@ -476,7 +476,7 @@ Planning a trip to Southeast Asia? Here's your ultimate packing guide to ensure 
 
 ## Clothing
 
-🎒 **What to pack:**
+**What to pack:**
 - 3-4 lightweight, quick-dry t-shirts
 - 2 pairs of shorts
 - 1-2 pairs of long pants
@@ -489,7 +489,7 @@ Planning a trip to Southeast Asia? Here's your ultimate packing guide to ensure 
 
 ## Toiletries & Health
 
-💊 **Health essentials:**
+**Health essentials:**
 - Sunscreen (SPF 50+)
 - Insect repellent (DEET-based)
 - Hand sanitizer
@@ -502,7 +502,7 @@ Planning a trip to Southeast Asia? Here's your ultimate packing guide to ensure 
 
 ## Electronics
 
-📱 **Tech gear:**
+**Tech gear:**
 - Smartphone
 - Power bank (10,000+ mAh)
 - Universal travel adapter
@@ -513,7 +513,7 @@ Planning a trip to Southeast Asia? Here's your ultimate packing guide to ensure 
 
 ## Accessories
 
-🎒 **Useful items:**
+**Useful items:**
 - Daypack (20-30L)
 - Dry bag for water activities
 - Reusable water bottle
@@ -525,13 +525,13 @@ Planning a trip to Southeast Asia? Here's your ultimate packing guide to ensure 
 
 ## Weather Considerations
 
-🌦️ **By season:**
+**By season:**
 - **Dry Season (Nov-Apr):** Light clothes, sunscreen
 - **Wet Season (May-Oct):** Lightweight rain jacket, quick-dry gear
 
 ## Pro Tips
 
-💡 **Packing wisdom:**
+**Packing wisdom:**
 1. **Pack light:** You can buy most things locally
 2. **Layer up:** Easier to adjust to temperature changes
 3. **Neutral colors:** Hide stains and dirt better
@@ -541,7 +541,7 @@ Planning a trip to Southeast Asia? Here's your ultimate packing guide to ensure 
 
 ## What NOT to Pack
 
-❌ **Leave at home:**
+**Leave at home:**
 - Expensive jewelry
 - Too many shoes (2-3 pairs max)
 - Heavy books (use e-reader)
@@ -574,7 +574,7 @@ Get your personalized packing list today!
 
 ## Giấy tờ & Tiền
 
-✅ **Bắt buộc:**
+**Bắt buộc:**
 - Hộ chiếu (còn hiệu lực 6+ tháng)
 - Giấy tờ visa/in e-visa
 - Giấy tờ bảo hiểm du lịch
@@ -585,7 +585,7 @@ Get your personalized packing list today!
 
 ## Quần áo
 
-🎒 **Cần mang:**
+**Cần mang:**
 - 3-4 áo phông nhẹ, khô nhanh
 - 2 quần short
 - 1-2 quần dài
@@ -598,7 +598,7 @@ Get your personalized packing list today!
 
 ## Đồ vệ sinh & Sức khỏe
 
-💊 **Thiết yếu về sức khỏe:**
+**Thiết yếu về sức khỏe:**
 - Kem chống nắng (SPF 50+)
 - Thuốc xịt chống muỗi (dựa trên DEET)
 - Nước rửa tay khô
@@ -611,7 +611,7 @@ Get your personalized packing list today!
 
 ## Thiết bị điện tử
 
-📱 **Thiết bị công nghệ:**
+**Thiết bị công nghệ:**
 - Điện thoại thông minh
 - Sạc dự phòng (10.000+ mAh)
 - Ổ cắm du lịch đa năng
@@ -622,7 +622,7 @@ Get your personalized packing list today!
 
 ## Phụ kiện
 
-🎒 **Đồ hữu ích:**
+**Đồ hữu ích:**
 - Ba lô nhỏ (20-30L)
 - Túi khô cho hoạt động nước
 - Chai nước tái sử dụng
@@ -634,13 +634,13 @@ Get your personalized packing list today!
 
 ## Cân nhắc thời tiết
 
-🌦️ **Theo mùa:**
+**Theo mùa:**
 - **Mùa khô (Tháng 11-Tháng 4):** Quần áo nhẹ, kem chống nắng
 - **Mùa mưa (Tháng 5-Tháng 10):** Áo mưa nhẹ, đồ khô nhanh
 
 ## Mẹo chuyên nghiệp
 
-💡 **Khôn ngoan trong việc đóng gói:**
+**Khôn ngoan trong việc đóng gói:**
 1. **Đóng gói nhẹ:** Bạn có thể mua hầu hết mọi thứ tại địa phương
 2. **Mặc nhiều lớp:** Dễ dàng điều chỉnh với thay đổi nhiệt độ
 3. **Màu trung tính:** Che vết bẩn tốt hơn
@@ -650,7 +650,7 @@ Get your personalized packing list today!
 
 ## Không nên mang
 
-❌ **Để ở nhà:**
+**Để ở nhà:**
 - Trang sức đắt tiền
 - Quá nhiều giày (tối đa 2-3 đôi)
 - Sách nặng (sử dụng máy đọc sách điện tử)

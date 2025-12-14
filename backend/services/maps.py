@@ -462,6 +462,194 @@ async def enrich_activities_parallel(trip_plan: dict, destination: str, batch_si
     return trip_plan
 
 
+async def get_place_suggestions_async(
+    destination: str,
+    location_coords: dict = None,
+    place_type_hint: Optional[str] = None,
+    limit: int = 5,
+) -> list:
+    """Return up to `limit` suggested places near `location_coords` (or destination center).
+
+    Uses Google Places Nearby Search and ranks by a simple rating/popularity score.
+    """
+    if limit <= 0:
+        return []
+
+    center = None
+    try:
+        if location_coords and location_coords.get("lat") and location_coords.get("lng"):
+            center = (float(location_coords.get("lat")), float(location_coords.get("lng")))
+    except Exception:
+        center = None
+
+    if not center:
+        try:
+            geo = await async_geocode(destination)
+            if geo.get("lat") and geo.get("lng"):
+                center = (float(geo["lat"]), float(geo["lng"]))
+        except Exception:
+            center = None
+
+    if not center or not center[0] or not center[1]:
+        return []
+
+    hint = (place_type_hint or "").strip().lower()
+
+    def is_sensitive_text(text: str) -> bool:
+        s = (text or "").lower()
+        banned = [
+            r"cung\s*c[aáàảãạ]p\s*girl",
+            r"\bgirl\b",
+            r"\bg[aáàảãạ]i\b",
+            r"escort",
+            r"massage",
+        ]
+        return any(re.search(p, s, re.IGNORECASE) for p in banned)
+
+    def is_food_types(place_types: list) -> bool:
+        t = [str(x or "").lower() for x in (place_types or [])]
+        return any(x in t for x in ["restaurant", "cafe", "meal_takeaway", "meal_delivery", "bakery", "bar"])
+
+    url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+    base_params = {
+        "location": f"{center[0]},{center[1]}",
+        "radius": 6000,
+        "key": GOOGLE_MAPS_API_KEY,
+        "language": "vi",
+    }
+
+    # For Ads: prioritize restaurants/cafes when not lodging.
+    query_types = ["lodging"] if hint in ["lodging", "hotel"] else ["restaurant", "cafe", "tourist_attraction"]
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            # Merge results from multiple nearbysearch calls (de-dup by place_id)
+            merged = {}
+            for t in query_types:
+                params = {**base_params, "type": t}
+                resp = await client.get(url, params=params)
+                data = resp.json()
+                if data.get("status") != "OK" or not data.get("results"):
+                    continue
+                for item in (data.get("results") or [])[:20]:
+                    pid = item.get("place_id")
+                    if not pid:
+                        continue
+                    # Prefer the first occurrence; we only need shallow fields
+                    if pid not in merged:
+                        merged[pid] = item
+
+            if not merged:
+                return []
+
+            results = list(merged.values())
+
+            def score(item: dict) -> float:
+                try:
+                    rating = float(item.get("rating") or 0)
+                except Exception:
+                    rating = 0.0
+                try:
+                    total = float(item.get("user_ratings_total") or 0)
+                except Exception:
+                    total = 0.0
+                base = rating * math.log10(1 + max(0.0, total))
+                types = item.get("types", []) or []
+                # Small boost for food places to make Ads candidates more likely.
+                if hint not in ["lodging", "hotel"] and is_food_types(types):
+                    base += 0.25
+                return base
+
+            results.sort(key=score, reverse=True)
+
+            capped = max(1, min(limit, 5))
+            if hint not in ["lodging", "hotel"]:
+                # Prefer to include at least a couple food places when available.
+                food = [r for r in results if is_food_types(r.get("types", []) or [])]
+                picked = []
+                picked_ids = set()
+                for r in food[: min(2, capped)]:
+                    pid = r.get("place_id")
+                    if pid:
+                        picked_ids.add(pid)
+                    picked.append(r)
+                for r in results:
+                    if len(picked) >= capped:
+                        break
+                    pid = r.get("place_id")
+                    if pid and pid in picked_ids:
+                        continue
+                    if pid:
+                        picked_ids.add(pid)
+                    picked.append(r)
+            else:
+                picked = results[:capped]
+
+            suggestions = []
+            for item in picked:
+                name = item.get("name", "")
+                addr = item.get("vicinity") or item.get("formatted_address") or ""
+                if is_sensitive_text(name) or is_sensitive_text(addr):
+                    continue
+
+                place_id = item.get("place_id")
+                loc = item.get("geometry", {}).get("location", {})
+                try:
+                    lat = float(loc.get("lat", 0))
+                    lng = float(loc.get("lng", 0))
+                except Exception:
+                    lat, lng = 0.0, 0.0
+
+                photos = item.get("photos", []) or []
+                photo_url = ""
+                if photos:
+                    ref = photos[0].get("photo_reference")
+                    if ref:
+                        photo_url = (
+                            "https://maps.googleapis.com/maps/api/place/photo"
+                            f"?maxwidth=800&photo_reference={ref}&key={GOOGLE_MAPS_API_KEY}"
+                        )
+
+                google_maps_link = (
+                    f"https://www.google.com/maps/search/?api=1&query={lat},{lng}&query_place_id={place_id}"
+                    if lat and lng and place_id
+                    else (f"https://www.google.com/maps/search/?api=1&query={lat},{lng}" if lat and lng else "")
+                )
+
+                place_types = item.get("types", []) or []
+                is_hotel = any(t in place_types for t in ["lodging", "hotel", "resort", "guest_house", "motel"]) or hint in [
+                    "lodging",
+                    "hotel",
+                ]
+                booking_link = (
+                    f"https://www.booking.com/searchresults.html?ss={quote((item.get('name') or '') + ' ' + (destination or ''))}"
+                    if is_hotel
+                    else ""
+                )
+
+                suggestions.append(
+                    {
+                        "name": name,
+                        "address": addr,
+                        "rating": item.get("rating", 0),
+                        "total_ratings": item.get("user_ratings_total", 0),
+                        "photo_url": photo_url,
+                        "lat": lat,
+                        "lng": lng,
+                        "types": place_types,
+                        "place_id": place_id,
+                        "google_maps_link": google_maps_link,
+                        "booking_link": booking_link,
+                        "is_hotel": is_hotel,
+                    }
+                )
+
+            return suggestions[: max(1, min(limit, 5))]
+    except Exception as e:
+        print(f"Error fetching place suggestions: {e}")
+        return []
+
+
 def generate_booking_link(destination: str, checkin: str, checkout: str, guests: int = 2) -> str:
     """Generate a Booking.com search link"""
     from urllib.parse import urlencode

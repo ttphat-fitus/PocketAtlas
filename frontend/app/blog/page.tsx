@@ -59,7 +59,9 @@ export default function BlogPage() {
       <div className="navbar bg-white shadow-sm">
         <div className="navbar-start">
           <a href="/" className="btn btn-ghost text-xl">
-            ← {language === "en" ? "Back" : "Quay lại"}
+            <span className="inline-flex items-center gap-2">
+              <span>{language === "en" ? "Back" :"← Quay lại"}</span>
+            </span>
           </a>
         </div>
 
@@ -133,7 +135,12 @@ export default function BlogPage() {
                 </div>
                 <div className="card-actions justify-end mt-4">
                   <a href={`/blog/${blogPosts[0].slug}`} className="btn btn-primary">
-                    {language === "en" ? "Read More" : "Đọc thêm"} →
+                    <span className="inline-flex items-center gap-2">
+                      <span>{language === "en" ? "Read More" : "Đọc thêm"}</span>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </span>
                   </a>
                 </div>
               </div>

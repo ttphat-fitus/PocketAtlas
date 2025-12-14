@@ -45,7 +45,7 @@ class PodcastService:
             if speech_key_path and os.path.exists(speech_key_path):
                 credentials = service_account.Credentials.from_service_account_file(speech_key_path)
                 self.tts_client = texttospeech.TextToSpeechClient(credentials=credentials)
-                print("[OK] TTS client initialized successfully.")
+                print("[OK] TTS client initialized successfully from file")
             else:
                 print("[WARN] Speech key not found. TTS features disabled.")
                 self.tts_client = None
@@ -107,13 +107,6 @@ class PodcastService:
             }
             
             db.collection("podcasts").document(trip_id).set(podcast_data)
-            
-            # Also save podcast_url to trip document for easy access
-            db.collection("trips").document(trip_id).update({
-                "podcast_url": audio_data_url,
-                "podcast_language": language,
-                "podcast_generated_at": datetime.now().isoformat()
-            })
             
             return {
                 "success": True,

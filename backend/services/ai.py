@@ -59,15 +59,15 @@ YÊU CẦU QUAN TRỌNG:
    - Nếu là khách sạn: ghi TÊN THẬT
 
 2. **Thời gian hợp lý**: 
-   - Bắt đầu từ 7:00-8:00, kết thúc 20:00-21:00
-   - Mỗi hoạt động từ 1.5-3 giờ
+   - Bắt đầu từ 7:00-8:00, kết thúc 20:00-22:00
+   - Mỗi hoạt động từ 45 phút đến 3 giờ, tùy loại hoạt động
   - LUÔN chừa thời gian di chuyển/nghỉ giữa 2 hoạt động liên tiếp (tối thiểu 15-45 phút)
   - KHÔNG được để thời gian kết thúc của hoạt động A trùng đúng thời gian bắt đầu của hoạt động B
 
 3. **Chi phí THỰC TẾ**:
-   - Ngân sách LOW: 50.000-150.000 đ/hoạt động
-   - Ngân sách MEDIUM: 150.000-500.000 đ/hoạt động  
-   - Ngân sách HIGH: 500.000-2.000.000 đ/hoạt động
+   - Ngân sách Thấp: 50.000-150.000 đ/hoạt động
+   - Ngân sách Trung Bình: 150.000-400.000 đ/hoạt động  
+   - Ngân sách Cao: 500.000-2.000.000 đ/hoạt động
    - QUAN TRỌNG: Mọi hoạt động ĐỀU PHẢI có chi phí cụ thể
 
 4. **CHI PHÍ FORMAT**: Chỉ ghi số tiền và đơn vị đ, KHÔNG thêm mô tả trong ngoặc đơn

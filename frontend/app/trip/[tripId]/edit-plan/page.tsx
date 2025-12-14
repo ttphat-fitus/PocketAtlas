@@ -60,7 +60,7 @@ export default function EditTripPlanPage() {
         };
 
         const storedLanguage = localStorage.getItem("language");
-        const backLabel = storedLanguage === "en" ? "Back" : "Quay lại";
+        const backLabel = storedLanguage === "en" ? "Back" : "← Quay lại";
 
         localStorage.setItem("tripPlan", JSON.stringify(normalizedPlan));
         localStorage.setItem("tripParams", JSON.stringify(tripParams));
@@ -83,7 +83,7 @@ export default function EditTripPlanPage() {
         <div className="alert alert-error max-w-lg">
           <span>{error}</span>
           <button className="btn btn-sm" onClick={() => router.push(`/trip/${tripId}`)}>
-            Quay lại
+            ← Quay lại
           </button>
         </div>
       </div>

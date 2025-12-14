@@ -1,29 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useAuth } from "../../../contexts/AuthContext";
 import StarRating from "../../../components/StarRating";
 import dynamic from "next/dynamic";
-
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 
 // Dynamic import for RouteMap to avoid SSR issues
 const RouteMap = dynamic(() => import("../../../components/RouteMap"), {
@@ -31,8 +13,7 @@ const RouteMap = dynamic(() => import("../../../components/RouteMap"), {
   loading: () => <div className="h-96 bg-gray-200 rounded-lg animate-pulse"></div>,
 });
 
-// NOTE: Trip detail is read-only; no drag-and-drop editing.
-// UPDATED: Trip detail supports drag-and-drop reordering within a day.
+// NOTE: Trip detail is read-only; no drag-and-drop or time editing.
 
 // Format date as dd/mm/yyyy
 const formatDate = (dateString: string): string => {
@@ -228,49 +209,73 @@ function vndMidpoint(vndText: string) {
   return (min + max) / 2;
 }
 
-function SortableActivityCard({
-  id,
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const r = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * r * Math.asin(Math.sqrt(h));
+}
+
+function dayTotalDistanceKm(day: Day | undefined | null): number {
+  if (!day?.activities?.length) return 0;
+  const points = day.activities
+    .map((a) => ({ lat: a.place_details?.lat, lng: a.place_details?.lng }))
+    .filter(
+      (p): p is { lat: number; lng: number } =>
+        typeof p.lat === "number" &&
+        typeof p.lng === "number" &&
+        p.lat !== 0 &&
+        p.lng !== 0
+    );
+  if (points.length < 2) return 0;
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    total += haversineKm(points[i], points[i + 1]);
+  }
+  return total;
+}
+
+function formatKm(km: number): string {
+  if (!km || km <= 0) return "0 km";
+  try {
+    return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(km)} km`;
+  } catch {
+    return `${km.toFixed(1)} km`;
+  }
+}
+
+function budgetLabel(raw: string | undefined, language: string): string {
+  const v = (raw || "").trim();
+  const n = v.toLowerCase();
+  if (language === "en") {
+    if (n === "low") return "Low";
+    if (n === "medium") return "Medium";
+    if (n === "high") return "High";
+    return v || "";
+  }
+  if (n === "low") return "Thấp";
+  if (n === "medium") return "Trung bình";
+  if (n === "high") return "Cao";
+  return v || "";
+}
+
+function ActivityCard({
   activity,
   language,
-  isModalOpen,
-  onOpenTimeEdit,
 }: {
-  id: string;
   activity: Activity;
   language: string;
-  isModalOpen: boolean;
-  onOpenTimeEdit: () => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id, disabled: isModalOpen });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.6 : 1,
-  };
-
   return (
-    <div ref={setNodeRef} style={style} className="card bg-white shadow-md hover:shadow-lg transition-all">
+    <div className="card bg-white shadow-md hover:shadow-lg transition-all">
       <div className="card-body p-4">
         <div className="flex gap-4">
-          <div
-            {...attributes}
-            {...listeners}
-            className="cursor-move text-gray-400 hover:text-gray-600 pt-1 touch-none select-none"
-            title={language === "en" ? "Drag to reorder" : "Kéo để sắp xếp"}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-            </svg>
-          </div>
-
           {activity.place_details?.photo_url && (
             <div className="avatar">
               <div className="w-20 h-20 rounded-lg">
@@ -282,17 +287,11 @@ function SortableActivityCard({
           <div className="flex-1">
             <div className="flex items-start justify-between mb-2">
               <div>
-                <button
-                  type="button"
-                  className="btn btn-xs btn-primary mb-1"
-                  title={language === "en" ? "Edit time" : "Chỉnh sửa thời gian"}
-                  onClick={onOpenTimeEdit}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {activity.time}
-                </button>
+                <div className="mb-2">
+                  <span className="inline-flex items-center px-2.5 py-1 text-xs font-semibold bg-primary text-white rounded-full">
+                    {activity.time}
+                  </span>
+                </div>
                 <div className="flex items-center gap-2">
                   <h4 className="font-bold text-lg">{activity.place}</h4>
                   {activity.place_details?.google_maps_link && (
@@ -368,7 +367,7 @@ export default function TripDetailPage() {
   const router = useRouter();
   const params = useParams();
   const tripId = params?.tripId as string;
-  const { language, setLanguage, t } = useLanguage();
+  const { language } = useLanguage();
   const { user, loading: authLoading, getIdToken } = useAuth();
   const [tripData, setTripData] = useState<TripData | null>(null);
   const [tripPlan, setTripPlan] = useState<TripPlan | null>(null);
@@ -386,14 +385,6 @@ export default function TripDetailPage() {
 
   const [collapsedRouteMaps, setCollapsedRouteMaps] = useState<Record<number, boolean>>({});
 
-  const [isTimeEditOpen, setIsTimeEditOpen] = useState(false);
-  const [timeEditTarget, setTimeEditTarget] = useState<{ dayIndex: number; activityIndex: number } | null>(null);
-  const [timeEditInput, setTimeEditInput] = useState("");
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
 
   // Redirect to auth if not authenticated
   useEffect(() => {
@@ -456,15 +447,6 @@ export default function TripDetailPage() {
       fetchTrip();
     }
   }, [user, tripId, getIdToken]);
-
-  useEffect(() => {
-    if (!isTimeEditOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isTimeEditOpen]);
 
   const handleRatingChange = async (newRating: number) => {
     if (!user || !tripId || ratingUpdating) return;
@@ -532,47 +514,6 @@ export default function TripDetailPage() {
     }
   };
 
-  const handleEditTime = (dayIndex: number, activityIndex: number, nextTime: string) => {
-    if (!tripPlan) return;
-    const newDays = [...tripPlan.days];
-    const day = newDays[dayIndex];
-    const newActivities = [...day.activities];
-    newActivities[activityIndex] = { ...newActivities[activityIndex], time: nextTime };
-    newDays[dayIndex] = { ...day, activities: newActivities };
-    setTripPlan({ ...tripPlan, days: newDays });
-  };
-
-  const openTimeEdit = (dayIndex: number, activityIndex: number) => {
-    if (!tripPlan) return;
-    const current = tripPlan.days?.[dayIndex]?.activities?.[activityIndex];
-    if (!current) return;
-    setTimeEditTarget({ dayIndex, activityIndex });
-    setTimeEditInput(current.time || "");
-    setIsTimeEditOpen(true);
-  };
-
-  const closeTimeEdit = () => {
-    setIsTimeEditOpen(false);
-    setTimeEditTarget(null);
-    setTimeEditInput("");
-  };
-
-  const handleDragEndForDay = (dayIndex: number) => (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id || !tripPlan) return;
-
-    const currentActivities = tripPlan.days?.[dayIndex]?.activities || [];
-    const oldIndex = currentActivities.findIndex((a) => a.client_id === String(active.id));
-    const newIndex = currentActivities.findIndex((a) => a.client_id === String(over.id));
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const newPlan = { ...tripPlan, days: [...tripPlan.days] };
-    newPlan.days[dayIndex] = {
-      ...newPlan.days[dayIndex],
-      activities: arrayMove(currentActivities, oldIndex, newIndex),
-    };
-    setTripPlan(newPlan);
-  };
 
   const handleUpdateCoverImage = async () => {
     if (!user || !tripId || !tripPlan || !coverImageUrl) return;
@@ -608,6 +549,10 @@ export default function TripDetailPage() {
     }
   };
 
+  const totalDistanceKm = useMemo(() => {
+    return (tripPlan?.days || []).reduce((acc, d) => acc + dayTotalDistanceKm(d), 0);
+  }, [tripPlan]);
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-green-50 flex items-center justify-center">
@@ -622,7 +567,7 @@ export default function TripDetailPage() {
         <div className="alert alert-error max-w-md">
           <span>{error || "Trip not found"}</span>
           <a href="/trips" className="btn btn-sm">
-            {language === "en" ? "Back to My Trips" : "Quay lại"}
+            {language === "en" ? "Back to My Trips" :"← Quay lại"}
           </a>
         </div>
       </div>
@@ -663,11 +608,11 @@ export default function TripDetailPage() {
                   alt={tripPlan.trip_name}
                   className="w-full h-full object-cover transition-opacity duration-500"
                   onLoad={() => {
-                    console.log("✓ Cover image loaded successfully:", tripPlan.cover_image);
+                    console.log("Cover image loaded successfully:", tripPlan.cover_image);
                     setCoverImageLoaded(true);
                   }}
                   onError={(e) => {
-                    console.error("✗ Cover image failed to load:", tripPlan.cover_image, e);
+                    console.error("Cover image failed to load:", tripPlan.cover_image, e);
                     setCoverImageLoaded(false);
                   }}
                 />
@@ -726,7 +671,7 @@ export default function TripDetailPage() {
                 </svg>
                 <div className="flex-1">
                   <div className="text-xs text-gray-500">{language === "en" ? "Budget" : "Ngân sách"}</div>
-                  <div className="font-semibold text-gray-800 capitalize">{tripData.budget}</div>
+                  <div className="font-semibold text-gray-800">{budgetLabel(tripData.budget, language)}</div>
                 </div>
               </div>
 
@@ -802,6 +747,8 @@ export default function TripDetailPage() {
                   <div className="font-bold text-indigo-700">
                     {tripPlan?.total_estimated_cost?.replace(/VND/g, '₫').replace(/đ/g, '₫') || '0 ₫'}
                   </div>
+
+                  {/* Per-day distances are shown inside each day card; overall plan distance removed */}
                 </div>
 
                 {/* Podcast Generation */}
@@ -1055,10 +1002,15 @@ export default function TripDetailPage() {
                         <h3 className="text-xl font-bold mobile-heading truncate">{day.title}</h3>
                       </div>
 
-                      <div className="badge badge-outline border-blue-500 text-blue-600 font-semibold whitespace-nowrap">
-                        {language === "en" ? "Daily cost" : "Tổng chi phí"}: {formatVndNumber(
-                          (day.activities || []).reduce((sum, activity) => sum + vndMidpoint(activity.estimated_cost), 0)
-                        )} đ
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="badge badge-outline border-blue-500 text-blue-600 font-semibold whitespace-nowrap">
+                          {language === "en" ? "Daily cost" : "Tổng chi phí"}: {formatVndNumber(
+                            (day.activities || []).reduce((sum, activity) => sum + vndMidpoint(activity.estimated_cost), 0)
+                          )} đ
+                        </div>
+                        <div className="badge badge-outline border-red-500 text-red-600 font-semibold whitespace-nowrap">
+                          {language === "en" ? "Distance" : "Tổng quãng đường"}: {formatKm(dayTotalDistanceKm(day))}
+                        </div>
                       </div>
                     </div>
 
@@ -1118,31 +1070,15 @@ export default function TripDetailPage() {
                       </div>
                     )}
 
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEndForDay(dayIndex)}
-                    >
-                      <SortableContext
-                        items={(day.activities || [])
-                          .map((a) => a.client_id)
-                          .filter((id): id is string => Boolean(id))}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <div className="space-y-3">
-                          {day.activities?.map((activity, actIdx) => (
-                            <SortableActivityCard
-                              key={activity.client_id || `${dayIndex}-${actIdx}`}
-                              id={activity.client_id || `${dayIndex}-${actIdx}`}
-                              activity={activity}
-                              language={language}
-                              isModalOpen={isTimeEditOpen}
-                              onOpenTimeEdit={() => openTimeEdit(dayIndex, actIdx)}
-                            />
-                          ))}
-                        </div>
-                      </SortableContext>
-                    </DndContext>
+                    <div className="space-y-3">
+                      {day.activities?.map((activity, actIdx) => (
+                        <ActivityCard
+                          key={activity.client_id || `${dayIndex}-${actIdx}`}
+                          activity={activity}
+                          language={language}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1150,66 +1086,6 @@ export default function TripDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Time Edit Modal (page-level to avoid DnD/Leaflet stacking issues) */}
-      {isTimeEditOpen && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[999999] flex items-center justify-center"
-          onClick={closeTimeEdit}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl p-5 max-w-sm w-full mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <h3 className="text-lg font-bold">{language === "en" ? "Edit time" : "Chỉnh sửa thời gian"}</h3>
-            </div>
-            <div className="text-xs text-gray-500 mb-3">{language === "en" ? "Format: HH:mm - HH:mm" : "Định dạng: HH:mm - HH:mm"}</div>
-            <input
-              type="text"
-              className="input input-bordered input-sm w-full mb-4"
-              placeholder={language === "en" ? "e.g., 08:00 - 10:00" : "VD: 08:00 - 10:00"}
-              value={timeEditInput}
-              onChange={(e) => setTimeEditInput(e.target.value)}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  if (timeEditTarget) {
-                    handleEditTime(timeEditTarget.dayIndex, timeEditTarget.activityIndex, timeEditInput);
-                  }
-                  closeTimeEdit();
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  closeTimeEdit();
-                }
-              }}
-            />
-            <div className="flex items-center justify-end gap-2">
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => {
-                  if (timeEditTarget) {
-                    handleEditTime(timeEditTarget.dayIndex, timeEditTarget.activityIndex, timeEditInput);
-                  }
-                  closeTimeEdit();
-                }}
-              >
-                {language === "en" ? "Save" : "Lưu"}
-              </button>
-              <button className="btn btn-sm btn-outline btn-primary" onClick={closeTimeEdit}>
-                {language === "en" ? "Cancel" : "Huỷ"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Cover Image Modal */}
       {showCoverImageModal && (

@@ -38,7 +38,9 @@ export default function BlogDetailPage() {
       <div className="navbar bg-white shadow-sm sticky top-0 z-50">
         <div className="navbar-start">
           <a href="/blog" className="btn btn-ghost">
-            ← Quay lại Blog
+            <span className="inline-flex items-center gap-2">
+              <span>← Quay lại Blog</span>
+            </span>
           </a>
         </div>
 
@@ -131,7 +133,12 @@ export default function BlogDetailPage() {
                     : "Để AI tạo lịch trình hoàn hảo trong vài phút"}
                 </p>
                 <a href="/trip/input" className="btn btn-primary btn-lg">
-                  {language === "en" ? "Start Planning" : "Bắt đầu lập kế hoạch"} →
+                  <span className="inline-flex items-center gap-2">
+                    <span>{language === "en" ? "Start Planning" : "Bắt đầu lập kế hoạch"}</span>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
                 </a>
               </div>
             </div>
@@ -141,7 +148,12 @@ export default function BlogDetailPage() {
         {/* Back to Blog */}
         <div className="text-center mt-8">
           <a href="/blog" className="btn btn-ghost">
-            ← {language === "en" ? "Back to all posts" : "Quay lại tất cả bài viết"}
+            <span className="inline-flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span>{language === "en" ? "Back to all posts" : "Quay lại tất cả bài viết"}</span>
+            </span>
           </a>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../contexts/AuthContext";
 
@@ -51,6 +51,28 @@ export default function CreateBlogPage() {
   const [useAI, setUseAI] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
 
+  const [toast, setToast] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+
+  const pushToast = (type: "success" | "error" | "info", message: string) => {
+    setToast({ type, message });
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 2500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
@@ -100,7 +122,7 @@ export default function CreateBlogPage() {
 
   const handleGenerateWithAI = async () => {
     if (!formData.trip_id) {
-      alert("Vui lòng chọn chuyến đi để tạo nội dung blog");
+      pushToast("error", "Vui lòng chọn chuyến đi để tạo nội dung blog");
       return;
     }
 
@@ -131,11 +153,11 @@ export default function CreateBlogPage() {
           tags: data.tags || [],
         });
       } else {
-        alert("Không thể tạo nội dung blog. Vui lòng thử lại.");
+        pushToast("error", "Không thể tạo nội dung blog. Vui lòng thử lại.");
       }
     } catch (err) {
       console.error("Error generating blog:", err);
-      alert("Đã xảy ra lỗi khi tạo nội dung.");
+      pushToast("error", "Đã xảy ra lỗi khi tạo nội dung.");
     } finally {
       setAiGenerating(false);
     }
@@ -145,7 +167,7 @@ export default function CreateBlogPage() {
     e.preventDefault();
     
     if (!formData.title || !formData.content) {
-      alert("Vui lòng điền các trường bắt buộc (Tiêu đề và Nội dung)");
+      pushToast("error", "Vui lòng điền các trường bắt buộc (Tiêu đề và Nội dung)");
       return;
     }
 
@@ -164,13 +186,14 @@ export default function CreateBlogPage() {
 
       if (response.ok) {
         const data = await response.json();
+        pushToast("success", "Đã tạo blog.");
         router.push(`/blog/${data.slug}`);
       } else {
-        alert("Không thể tạo bài blog. Vui lòng thử lại.");
+        pushToast("error", "Không thể tạo bài blog. Vui lòng thử lại.");
       }
     } catch (err) {
       console.error("Error creating blog:", err);
-      alert("Đã xảy ra lỗi khi tạo bài blog.");
+      pushToast("error", "Đã xảy ra lỗi khi tạo bài blog.");
     } finally {
       setIsSubmitting(false);
     }
@@ -186,14 +209,28 @@ export default function CreateBlogPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50">
+      {toast && (
+        <div className="fixed top-4 right-4 z-[1000000]">
+          <div
+            className={`alert shadow-lg ${
+              toast.type === "success"
+                ? "alert-success"
+                : toast.type === "error"
+                  ? "alert-error"
+                  : "alert-info"
+            }`}
+            role="status"
+          >
+            <span className="text-sm">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
       {/* Navbar */}
       <div className="navbar bg-white shadow-sm sticky top-0 z-50">
         <div className="navbar-start">
           <a href="/blog" className="btn btn-ghost gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Quay lại Blog
+            ← Quay lại Blog
           </a>
         </div>
         <div className="navbar-center">

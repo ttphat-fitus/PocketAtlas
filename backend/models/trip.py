@@ -14,8 +14,8 @@ class TripRequest(BaseModel):
     group_size: Optional[int] = None
     travel_mode: Optional[str] = ""
     categories: Optional[list] = []
-    active_time_start: Optional[int] = 9
-    active_time_end: Optional[int] = 21
+    active_time_start: Optional[int] = 8
+    active_time_end: Optional[int] = 22
 
 
 class RatingRequest(BaseModel):

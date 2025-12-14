@@ -1,26 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { ReactElement } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { getIdToken } from "../../lib/firebase";
 
-// Badge icon SVG mapper with emoji fallback (EXCEPTION CASE for badges only)
-const BadgeIcon = ({ icon, className = "w-8 h-8", showEmojiFallback = false }: { icon: string; className?: string; showEmojiFallback?: boolean }) => {
-  // Emoji fallback mapping (ONLY for badge display, exceptional case)
-  const emojiMap: { [key: string]: string } = {
-    compass: "🧭",
-    backpack: "🎒",
-    rocket: "🚀",
-    star: "⭐",
-    map: "🗺️",
-    fire: "🔥",
-    globe: "🌍",
-    pen: "✍️"
-  };
-  
+// Badge icon SVG mapper
+const BadgeIcon = ({ icon, className = "w-8 h-8" }: { icon: string; className?: string }) => {
   const icons: { [key: string]: ReactElement } = {
     compass: (
       <svg className={className} fill="currentColor" viewBox="0 0 20 20">
@@ -63,11 +51,6 @@ const BadgeIcon = ({ icon, className = "w-8 h-8", showEmojiFallback = false }: {
       </svg>
     ),
   };
-  
-  // If emoji fallback requested and icon exists in emoji map, show emoji
-  if (showEmojiFallback && emojiMap[icon]) {
-    return <span className="text-3xl">{emojiMap[icon]}</span>;
-  }
   
   // Otherwise return SVG
   return icons[icon] || icons.star;
@@ -152,6 +135,28 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState("");
   const [activeTab, setActiveTab] = useState<"overview" | "badges" | "rewards">("overview");
+
+  const [toast, setToast] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+
+  const pushToast = (type: "success" | "error" | "info", message: string) => {
+    setToast({ type, message });
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 2500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
   
   // Edit form state
   const [displayName, setDisplayName] = useState("");
@@ -235,10 +240,14 @@ export default function ProfilePage() {
         fetchBadgesAndStats();
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to redeem reward");
+        pushToast(
+          "error",
+          error.error || (language === "en" ? "Failed to redeem reward" : "Không thể đổi thưởng")
+        );
       }
     } catch (err) {
       console.error("Failed to redeem reward:", err);
+      pushToast("error", language === "en" ? "Failed to redeem reward" : "Không thể đổi thưởng");
     }
   };
 
@@ -415,11 +424,33 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+      {toast && (
+        <div className="fixed top-4 right-4 z-[1000000]">
+          <div
+            className={`alert shadow-lg ${
+              toast.type === "success"
+                ? "alert-success"
+                : toast.type === "error"
+                  ? "alert-error"
+                  : "alert-info"
+            }`}
+            role="status"
+          >
+            <span className="text-sm">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
       {/* Navbar */}
       <div className="navbar bg-white shadow-md">
         <div className="navbar-start">
           <button onClick={() => router.back()} className="btn btn-ghost">
-            ← {language === "en" ? "Back" : "Quay lại"}
+            <span className="inline-flex items-center gap-2">
+              {/* <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg> */}
+              <span>{language === "en" ? "Back" : "← Quay lại"}</span>
+            </span>
           </button>
         </div>
         <div className="navbar-center">

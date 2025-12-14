@@ -6,6 +6,83 @@ import { useLanguage } from "../../../../contexts/LanguageContext";
 import { useAuth } from "../../../../contexts/AuthContext";
 import RouteMap from "../../../../components/RouteMap";
 
+const formatPrice = (price: string | undefined): string => {
+  if (!price) return "Miễn phí";
+  const normalized = price.trim().toLowerCase();
+  if (
+    normalized === "0" ||
+    normalized === "0đ" ||
+    normalized === "0 đ" ||
+    normalized === "0vnd" ||
+    normalized === "0 vnd" ||
+    normalized === "free" ||
+    normalized === "miễn phí"
+  ) {
+    return "Miễn phí";
+  }
+  return price.replace(/VND/gi, "₫").replace(/đ/g, "₫");
+};
+
+function formatVndNumber(amount: number) {
+  try {
+    return new Intl.NumberFormat("vi-VN").format(Math.round(amount));
+  } catch {
+    return String(Math.round(amount));
+  }
+}
+
+function vndMidpoint(vndText: string | undefined) {
+  if (!vndText) return 0;
+  const lower = vndText.toLowerCase();
+  if (lower.includes("free") || lower.includes("miễn")) return 0;
+  const normalized = vndText.replace(/\./g, "").replace(/,/g, "");
+  const nums = normalized.match(/\d+/g) || [];
+  if (nums.length === 0) return 0;
+  const values = nums.map((n) => Number(n)).filter((n) => Number.isFinite(n));
+  if (values.length === 0) return 0;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return (min + max) / 2;
+}
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const r = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * r * Math.asin(Math.sqrt(h));
+}
+
+function dayTotalDistanceKm(day: Day | undefined | null): number {
+  if (!day?.activities?.length) return 0;
+  const points = (day.activities || [])
+    .map((a) => ({ lat: a.place_details?.lat, lng: a.place_details?.lng }))
+    .filter(
+      (p): p is { lat: number; lng: number } =>
+        typeof p.lat === "number" && typeof p.lng === "number" && !!p.lat && !!p.lng
+    );
+  if (points.length < 2) return 0;
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    total += haversineKm(points[i], points[i + 1]);
+  }
+  return total;
+}
+
+function formatKm(km: number): string {
+  if (!km || km <= 0) return "0 km";
+  try {
+    return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(km)} km`;
+  } catch {
+    return `${km.toFixed(1)} km`;
+  }
+}
+
 interface PlaceDetails {
   name: string;
   address: string;
@@ -188,7 +265,10 @@ export default function ExploreDetailPage() {
       <div className="navbar bg-white shadow-md sticky top-0 z-50">
         <div className="navbar-start">
           <button onClick={() => router.back()} className="btn btn-ghost">
-            ← {language === "en" ? "Back" : "Quay lại"}
+            {/* <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg> */}
+            <span>{language === "en" ? "Back" : "← Quay lại"}</span>
           </button>
         </div>
         <div className="navbar-center">
@@ -303,6 +383,19 @@ export default function ExploreDetailPage() {
           <div className="card-body">
             <h2 className="text-2xl font-bold mb-6">{currentDay.title}</h2>
 
+            <div className="flex flex-col items-start gap-2 mb-6">
+              <div className="badge badge-outline border-blue-500 text-blue-600 font-semibold whitespace-nowrap">
+                {language === "en" ? "Daily cost" : "Tổng chi phí"}: {formatVndNumber(
+                  (currentDay.activities || []).reduce((sum, activity) => sum + vndMidpoint(activity.estimated_cost), 0)
+                )} đ
+              </div>
+              <div className="badge badge-outline border-red-500 text-red-700 font-semibold whitespace-nowrap">
+                {language === "en"
+                  ? `Total distance: ${formatKm(dayTotalDistanceKm(currentDay))}`
+                  : `Tổng quãng đường: ${formatKm(dayTotalDistanceKm(currentDay))}`}
+              </div>
+            </div>
+
             {/* Route Map */}
             {currentDay.activities.some(a => a.place_details?.lat && a.place_details?.lng) && (
               <div className="mb-6">
@@ -345,7 +438,7 @@ export default function ExploreDetailPage() {
                         </div>
                         <p className="text-gray-600 mt-2">{activity.description}</p>
                         <p className="text-sm text-green-600 font-semibold mt-2">
-                          {activity.estimated_cost?.replace(/VND/g, '₫').replace(/đ/g, '₫') || 'Miễn phí'}
+                          {formatPrice(activity.estimated_cost)}
                         </p>
                       </div>
                       {activity.place_details?.photo_url && (

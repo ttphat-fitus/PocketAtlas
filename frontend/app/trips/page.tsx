@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -18,6 +18,8 @@ interface TripSummary {
   activity_level?: string;
   cover_image?: string;
 }
+
+type ToastType = "success" | "error" | "info";
 
 // Format date as dd/mm/yyyy
 const formatDate = (dateString: string): string => {
@@ -98,6 +100,28 @@ export default function MyTripsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [toast, setToast] = useState<{ type: ToastType; message: string } | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const [confirmDeleteTripId, setConfirmDeleteTripId] = useState<string | null>(null);
+
+  const pushToast = (type: ToastType, message: string) => {
+    setToast({ type, message });
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 2500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -140,10 +164,13 @@ export default function MyTripsPage() {
     }
   };
 
-  const deleteTrip = async (tripId: string) => {
-    if (!confirm(language === "en" ? "Delete this trip?" : "Xóa chuyến đi này?")) {
-      return;
-    }
+  const requestDeleteTrip = (tripId: string) => {
+    setConfirmDeleteTripId(tripId);
+  };
+
+  const performDeleteTrip = async () => {
+    if (!confirmDeleteTripId) return;
+    const tripId = confirmDeleteTripId;
 
     try {
       const token = await getIdToken();
@@ -159,8 +186,12 @@ export default function MyTripsPage() {
       }
 
       setTrips(trips.filter((t) => t.trip_id !== tripId));
+      pushToast("success", language === "en" ? "Deleted." : "Đã xoá.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete trip");
+      const msg = err instanceof Error ? err.message : "Failed to delete trip";
+      pushToast("error", language === "en" ? `Delete failed: ${msg}` : `Xoá thất bại: ${msg}`);
+    } finally {
+      setConfirmDeleteTripId(null);
     }
   };
 
@@ -244,7 +275,12 @@ export default function MyTripsPage() {
       <div className="navbar bg-white shadow-sm">
         <div className="navbar-start">
           <a href="/" className="btn btn-ghost text-xl">
-            ← {language === "en" ? "Back" : "Quay lại"}
+            <span className="inline-flex items-center gap-2">
+              {/* <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg> */}
+              <span>{language === "en" ? "Back" : "← Quay lại"}</span>
+            </span>
           </a>
         </div>
 
@@ -297,7 +333,9 @@ export default function MyTripsPage() {
                     onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
                     className="btn btn-circle btn-sm btn-ghost"
                   >
-                    ←
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
                   </button>
                   <h2 className="text-lg font-bold capitalize">
                     {monthName}
@@ -306,7 +344,9 @@ export default function MyTripsPage() {
                     onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
                     className="btn btn-circle btn-sm btn-ghost"
                   >
-                    →
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </button>
                 </div>
 
@@ -462,7 +502,7 @@ export default function MyTripsPage() {
 
                       <div className="flex gap-2 justify-end">
                         <button
-                          onClick={() => deleteTrip(trip.trip_id)}
+                          onClick={() => requestDeleteTrip(trip.trip_id)}
                           className="btn btn-sm btn-ghost text-error"
                         >
                           {language === "en" ? "Delete" : "Xóa"}
@@ -479,6 +519,58 @@ export default function MyTripsPage() {
           </div>
         )}
       </div>
+
+      {toast && (
+        <div className="fixed top-4 right-4 z-[1000000]">
+          <div
+            className={`alert shadow-lg ${
+              toast.type === "success"
+                ? "alert-success"
+                : toast.type === "error"
+                  ? "alert-error"
+                  : "alert-info"
+            }`}
+            role="status"
+          >
+            <span className="text-sm">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteTripId && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[999998]"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setConfirmDeleteTripId(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl p-5 max-w-sm w-full mx-4 pointer-events-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold mb-2">
+              {language === "en" ? "Delete trip" : "Xoá chuyến đi"}
+            </h3>
+            <div className="text-sm text-gray-600">
+              {language === "en"
+                ? "This action cannot be undone."
+                : "Hành động này không thể hoàn tác."}
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={() => setConfirmDeleteTripId(null)}
+              >
+                {language === "en" ? "Cancel" : "Huỷ"}
+              </button>
+              <button type="button" className="btn btn-sm btn-error" onClick={performDeleteTrip}>
+                {language === "en" ? "Delete" : "Xoá"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

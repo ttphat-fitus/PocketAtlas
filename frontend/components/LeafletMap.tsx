@@ -199,7 +199,27 @@ export default function LeafletMap({
       const controller = new AbortController();
       const profile = osrmProfileForTravelMode(travelMode);
 
-      const drawPolyline = (path: L.LatLngExpression[]) => {
+      const isValidLatLngExpr = (p: L.LatLngExpression): boolean => {
+        if (Array.isArray(p)) {
+          const lat = Number(p[0]);
+          const lng = Number(p[1]);
+          return Number.isFinite(lat) && Number.isFinite(lng);
+        }
+        // Leaflet may accept LatLng objects, but we only generate arrays.
+        try {
+          const anyP: any = p as any;
+          return Number.isFinite(anyP?.lat) && Number.isFinite(anyP?.lng);
+        } catch {
+          return false;
+        }
+      };
+
+      const sanitizePath = (path: L.LatLngExpression[]) =>
+        (Array.isArray(path) ? path : []).filter(isValidLatLngExpr);
+
+      const drawPolyline = (pathRaw: L.LatLngExpression[]) => {
+        const path = sanitizePath(pathRaw);
+        if (path.length < 2) return;
         // Shadow line for depth and visibility
         L.polyline(path, {
           color: "#000000",
@@ -226,7 +246,9 @@ export default function LeafletMap({
             ];
 
             const routed = await fetchOsrmRoute(profile, segCoords, controller.signal);
-            drawPolyline(routed || [fallbackPoints[startIndex], fallbackPoints[startIndex + 1]]);
+            drawPolyline(
+              routed || [fallbackPoints[startIndex], fallbackPoints[startIndex + 1]]
+            );
             return;
           }
 
@@ -299,7 +321,7 @@ export default function LeafletMap({
   }
 
   return (
-    <div className="relative" style={{ height }}>
+    <div className="relative z-0" style={{ height }}>
       <div 
         ref={mapRef} 
         className="w-full h-full rounded-lg shadow-lg overflow-hidden"
@@ -307,7 +329,7 @@ export default function LeafletMap({
       />
       
       {/* Legend */}
-      <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur rounded-lg shadow-lg p-3 max-w-[200px] max-h-40 overflow-y-auto z-[1000]">
+      <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur rounded-lg shadow-lg p-3 max-w-[200px] max-h-40 overflow-y-auto z-20">
         <div className="text-xs font-bold text-gray-700 mb-2 flex items-center gap-1">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />

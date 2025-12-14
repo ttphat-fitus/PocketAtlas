@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useAuth } from "../../../contexts/AuthContext";
 import {
@@ -98,6 +98,47 @@ function vndMidpoint(raw: string | undefined): number {
   return Math.round((min + max) / 2);
 }
 
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const r = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * r * Math.asin(Math.sqrt(h));
+}
+
+function dayTotalDistanceKm(day: Day | undefined | null): number {
+  if (!day?.activities?.length) return 0;
+  const points = day.activities
+    .map((a) => ({ lat: a.place_details?.lat, lng: a.place_details?.lng }))
+    .filter(
+      (p): p is { lat: number; lng: number } =>
+        typeof p.lat === "number" &&
+        typeof p.lng === "number" &&
+        p.lat !== 0 &&
+        p.lng !== 0
+    );
+  if (points.length < 2) return 0;
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    total += haversineKm(points[i], points[i + 1]);
+  }
+  return total;
+}
+
+function formatKm(km: number): string {
+  if (!km || km <= 0) return "0 km";
+  try {
+    return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(km)} km`;
+  } catch {
+    return `${km.toFixed(1)} km`;
+  }
+}
+
 interface PlaceDetails {
   name: string;
   address: string;
@@ -111,6 +152,100 @@ interface PlaceDetails {
   google_maps_link?: string;
   booking_link?: string;
   is_hotel?: boolean;
+}
+
+type PlaceSuggestion = PlaceDetails & { is_ad?: boolean };
+
+type TimeAdjustMode = "push_preserve_gaps" | "push_compact" | "keep_following";
+
+type ToastType = "success" | "error" | "info";
+
+function normalizePlaceKey(text: string): string {
+  return (text || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function buildExistingPlaceKeySet(activities: Activity[], excludeIndex: number): Set<string> {
+  const s = new Set<string>();
+  for (let i = 0; i < (activities || []).length; i++) {
+    if (i === excludeIndex) continue;
+    const a = activities[i];
+    const pid = a?.place_details?.place_id;
+    if (pid) s.add(`pid:${pid}`);
+    const p1 = normalizePlaceKey(a?.place || "");
+    if (p1) s.add(`name:${p1}`);
+    const p2 = normalizePlaceKey(a?.place_details?.name || "");
+    if (p2) s.add(`name:${p2}`);
+  }
+  return s;
+}
+
+function isSensitiveSuggestionText(text: string): boolean {
+  const s = (text || "").toLowerCase();
+  const banned = [
+    /cung\s*c[aáàảãạ]p\s*girl/i,
+    /\bgirl\b/i,
+    /\bg[aáàảãạ]i\b/i,
+    /escort/i,
+    /massage/i,
+  ];
+  return banned.some((r) => r.test(s));
+}
+
+function isFoodSuggestion(types?: string[]): boolean {
+  const t = (types || []).map((x) => String(x || "").toLowerCase());
+  return t.some((x) =>
+    ["restaurant", "cafe", "meal_takeaway", "meal_delivery", "bakery", "bar"].includes(x)
+  );
+}
+
+function isValidTimeRangeText(text: string): boolean {
+  return /\b\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\b/.test(text || "");
+}
+
+function hashStringToInt(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function decorateSuggestionsWithAds(activityId: string, suggestions: PlaceDetails[]): PlaceSuggestion[] {
+  const filtered = (suggestions || [])
+    .filter((s) => {
+      const name = String(s?.name || "");
+      const address = String(s?.address || "");
+      return !(isSensitiveSuggestionText(name) || isSensitiveSuggestionText(address));
+    })
+    .slice(0, 5);
+
+  if (filtered.length === 0) return [];
+
+  const h = hashStringToInt(activityId);
+  const adCount = filtered.length >= 2 ? ((h % 2) + 1) : 1;
+
+  const foodIdxs = filtered
+    .map((s, idx) => (isFoodSuggestion(s.types) ? idx : -1))
+    .filter((idx) => idx >= 0);
+  const candidates = foodIdxs.length > 0 ? foodIdxs : filtered.map((_, idx) => idx);
+
+  const idxs = new Set<number>();
+  for (let i = 0; i < adCount; i++) {
+    idxs.add(candidates[(h + i * 7) % candidates.length]);
+  }
+
+  const tagged = filtered.map((s, index) => ({ ...s, is_ad: idxs.has(index), _index: index } as any));
+  tagged.sort((a: any, b: any) => {
+    const adA = a.is_ad ? 1 : 0;
+    const adB = b.is_ad ? 1 : 0;
+    if (adA !== adB) return adB - adA;
+    return a._index - b._index;
+  });
+  return tagged.map(({ _index, ...rest }: any) => rest);
 }
 
 function googleMapsHref(details?: PlaceDetails): string {
@@ -224,7 +359,10 @@ function ensureActivityIds(plan: TripPlan): TripPlan {
 // Helper function to parse time string (e.g., "08:00" or "08:00 - 10:00")
 function parseTime(timeStr: string): { start: number; end: number; duration: number } {
   try {
-    const parts = timeStr.split("-").map((t) => t.trim());
+    const normalizedInput = (timeStr || "")
+      .replace(/[–—]/g, "-")
+      .replace(/\s+to\s+/gi, "-");
+    const parts = normalizedInput.split("-").map((t) => t.trim());
     const parseHourMin = (t: string) => {
       const cleaned = t.replace(/[^\d:]/g, ""); // Remove non-digit/colon characters
       const [hour, min] = cleaned.split(":").map(Number);
@@ -236,7 +374,7 @@ function parseTime(timeStr: string): { start: number; end: number; duration: num
     if (start === null) throw new Error("Invalid start time");
     
     const end = parts.length > 1 ? parseHourMin(parts[1]) : start + 120; // default 2 hours
-    const duration = end && end > start ? end - start : 120; // default 2 hours if invalid
+    const duration = typeof end === "number" && end > start ? end - start : 120; // default 2 hours if invalid
     
     return { start, end: end || start + 120, duration };
   } catch {
@@ -307,6 +445,11 @@ interface SortableActivityProps {
   dayIndex: number;
   isEditing: boolean;
   isModalOpen: boolean;
+  suggestions: PlaceSuggestion[];
+  suggestionsLoading: boolean;
+  existingPlaceKeys: Set<string>;
+  onRequestSuggestions: () => void;
+  onPickSuggestion: (s: PlaceSuggestion) => void;
   onEdit: (field: keyof Activity, value: string) => void;
   onOpenTimeEdit: (currentTime: string) => void;
   onStartEdit: () => void;
@@ -324,6 +467,11 @@ function SortableActivity({
   dayIndex,
   isEditing,
   isModalOpen,
+  suggestions,
+  suggestionsLoading,
+  existingPlaceKeys,
+  onRequestSuggestions,
+  onPickSuggestion,
   onEdit,
   onOpenTimeEdit,
   onStartEdit,
@@ -334,6 +482,14 @@ function SortableActivity({
   t,
 }: SortableActivityProps) {
   const [showTips, setShowTips] = useState(false);
+  const showSuggestions = !activity.place;
+
+  useEffect(() => {
+    if (!showSuggestions) return;
+    if (suggestionsLoading) return;
+    if (suggestions && suggestions.length > 0) return;
+    onRequestSuggestions();
+  }, [showSuggestions, suggestionsLoading, suggestions, onRequestSuggestions]);
   const {
     attributes,
     listeners,
@@ -398,7 +554,7 @@ function SortableActivity({
                 </button>
 
                 {/* Price Badge */}
-                {/* {isEditing ? (
+                {isEditing ? (
                   <input
                     type="text"
                     className="input input-bordered input-sm w-44"
@@ -410,7 +566,7 @@ function SortableActivity({
                   <div className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full whitespace-nowrap">
                     {formatPrice(activity.estimated_cost)}
                   </div>
-                )} */}
+                )}
 
                 {/* Tips Toggle Button */}
                 {/* {activity.tips && !isEditing && (
@@ -437,6 +593,9 @@ function SortableActivity({
                     placeholder={t("Nhập địa điểm")}
                     value={activity.place}
                     autoFocus={Boolean(activity._isNew || !activity.place)}
+                    onFocus={() => {
+                      if (!activity.place) onRequestSuggestions();
+                    }}
                     onChange={(e) => onEdit("place", e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -507,6 +666,61 @@ function SortableActivity({
                       </a>
                     );
                   })()}
+                </div>
+              )}
+
+              {showSuggestions && (
+                <div className="mt-2 mb-3">
+                  <div className="text-xs font-semibold text-gray-600 mb-2">
+                    {t("Gợi ý")}
+                  </div>
+                  {suggestionsLoading && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span className="loading loading-spinner loading-xs"></span>
+                      <span>{t("Đang tải")}</span>
+                    </div>
+                  )}
+                  {!suggestionsLoading && suggestions.length > 0 && (
+                    <div className="space-y-2">
+                      {suggestions
+                        .filter((s) => {
+                          const name = String(s?.name || "");
+                          const address = String(s?.address || "");
+                          return !(isSensitiveSuggestionText(name) || isSensitiveSuggestionText(address));
+                        })
+                        .filter((s) => {
+                          const pid = s?.place_id ? `pid:${String(s.place_id)}` : "";
+                          const nameKey = `name:${normalizePlaceKey(String(s?.name || ""))}`;
+                          if (pid && existingPlaceKeys.has(pid)) return false;
+                          if (existingPlaceKeys.has(nameKey)) return false;
+                          return true;
+                        })
+                        .slice(0, 5)
+                        .map((s, idx) => (
+                        <button
+                          key={`${id}-sug-${idx}`}
+                          type="button"
+                          className={
+                            s.is_ad
+                              ? "btn btn-sm w-full justify-start gap-2 border-2 border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                              : "btn btn-sm btn-outline w-full justify-start gap-2"
+                          }
+                          onClick={() => onPickSuggestion(s)}
+                        >
+                          {s.is_ad && <span className="badge badge-warning">Ads</span>}
+                          <span className="truncate flex-1 text-left">{s.name}</span>
+                          {typeof s.rating === "number" && s.rating > 0 && (
+                            <span className="flex items-center gap-1 text-xs text-gray-500 whitespace-nowrap">
+                              <svg className="w-3 h-3 text-yellow-500 fill-current" viewBox="0 0 20 20">
+                                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                              </svg>
+                              <span>{s.rating.toFixed(1)}</span>
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -642,6 +856,7 @@ function SortableRouteItem({
 }
 
 export default function TripPlanPage() {
+  const pathname = usePathname();
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
   const { user, loading: authLoading, getIdToken } = useAuth();
@@ -659,14 +874,43 @@ export default function TripPlanPage() {
   const [isRouteMapCollapsed, setIsRouteMapCollapsed] = useState(false);
   const [isWeatherCollapsed, setIsWeatherCollapsed] = useState(false);
   const [resolvingActivityIds, setResolvingActivityIds] = useState<Record<string, boolean>>({});
+  const [suggestionsByActivityId, setSuggestionsByActivityId] = useState<Record<string, PlaceSuggestion[]>>({});
+  const [suggestingActivityIds, setSuggestingActivityIds] = useState<Record<string, boolean>>({});
   const [activeRouteSegmentStartIndex, setActiveRouteSegmentStartIndex] = useState<number | null>(null);
   const [savingPlan, setSavingPlan] = useState(false);
+  const [toast, setToast] = useState<{ type: ToastType; message: string } | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const savedSnapshotRef = useRef<string | null>(null);
+  const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{
+    dayIndex: number;
+    activityIndex: number;
+  } | null>(null);
+
+  const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
+
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+  const [timelineDayIndex, setTimelineDayIndex] = useState<number | null>(null);
+  const [timelineDraft, setTimelineDraft] = useState<Record<string, { start: number; end: number; duration: number }>>({});
+  const [timelineLocked, setTimelineLocked] = useState<Record<string, boolean>>({});
+  const [timelineFocusId, setTimelineFocusId] = useState<string | null>(null);
+  const [timelineDragging, setTimelineDragging] = useState<
+    | {
+        activityId: string;
+        action: "resize" | "move";
+        edge?: "top" | "bottom";
+        startY: number;
+        originStart: number;
+        originEnd: number;
+      }
+    | null
+  >(null);
   const [timeEditTarget, setTimeEditTarget] = useState<{
     dayIndex: number;
     activityIndex: number;
     currentTime: string;
   } | null>(null);
   const [timeEditInput, setTimeEditInput] = useState<string>("");
+  const [timeAdjustMode, setTimeAdjustMode] = useState<TimeAdjustMode>("push_preserve_gaps");
   const isTimeEditOpen = Boolean(timeEditTarget);
 
   // Drag and drop sensors
@@ -697,6 +941,7 @@ export default function TripPlanPage() {
       const withIds = ensureActivityIds(parsed);
       setTripPlan(withIds);
       localStorage.setItem("tripPlan", JSON.stringify(withIds));
+      savedSnapshotRef.current = JSON.stringify(withIds);
     } else {
       router.push("/trip/input");
     }
@@ -705,6 +950,27 @@ export default function TripPlanPage() {
       setTripParams(JSON.parse(storedParams));
     }
   }, [router]);
+
+  const isDirty = useMemo(() => {
+    if (!tripPlan) return false;
+    const snap = savedSnapshotRef.current;
+    if (!snap) return false;
+    try {
+      return JSON.stringify(tripPlan) !== snap;
+    } catch {
+      return true;
+    }
+  }, [tripPlan]);
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
 
   useEffect(() => {
     setActiveRouteSegmentStartIndex(null);
@@ -719,15 +985,426 @@ export default function TripPlanPage() {
     };
   }, [isTimeEditOpen]);
 
-  const openTimeEdit = (dayIndex: number, activityIndex: number, currentTime: string) => {
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const pushToast = (type: ToastType, message: string) => {
+    setToast({ type, message });
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 2500);
+  };
+
+  const requestLeave = () => {
+    if (isDirty) {
+      setConfirmLeaveOpen(true);
+      return;
+    }
+
+    const target = pathname.includes("/edit-plan") && tripPlan?.trip_id
+      ? `/trip/${tripPlan.trip_id}`
+      : "/";
+    router.push(target);
+  };
+
+  const requestDeleteActivity = (dayIndex: number, activityIndex: number) => {
+    setConfirmDeleteTarget({ dayIndex, activityIndex });
+  };
+
+  const performDeleteActivity = () => {
+    if (!tripPlan || !confirmDeleteTarget) return;
+    const { dayIndex, activityIndex } = confirmDeleteTarget;
+
+    const newPlan = { ...tripPlan };
+    newPlan.days = [...newPlan.days];
+    newPlan.days[dayIndex] = {
+      ...newPlan.days[dayIndex],
+      activities: [...newPlan.days[dayIndex].activities],
+    };
+    newPlan.days[dayIndex].activities.splice(activityIndex, 1);
+
+    setTripPlan(newPlan);
+    localStorage.setItem("tripPlan", JSON.stringify(newPlan));
+    setConfirmDeleteTarget(null);
+    pushToast("success", language === "en" ? "Deleted." : "Đã xoá hoạt động.");
+  };
+
+  const openTimeEditText = (dayIndex: number, activityIndex: number, currentTime: string) => {
     setTimeEditTarget({ dayIndex, activityIndex, currentTime });
     setTimeEditInput(currentTime);
+  };
+
+  const openTimeEdit = (dayIndex: number, activityIndex: number, _currentTime: string) => {
+    if (!tripPlan) return;
+    const a = tripPlan.days?.[dayIndex]?.activities?.[activityIndex];
+    const id = a?.client_id || null;
+    openTimeline(dayIndex, id);
   };
 
   const closeTimeEdit = () => {
     setTimeEditTarget(null);
     setTimeEditInput("");
   };
+
+  const applyTimeEdit = () => {
+    if (!tripPlan || !timeEditTarget) return false;
+    if (!isValidTimeRangeText(timeEditInput)) return false;
+
+    const { dayIndex, activityIndex } = timeEditTarget;
+    const day = tripPlan.days?.[dayIndex];
+    if (!day) return false;
+
+    const originalActivities = [...(day.activities || [])];
+    const activities = [...originalActivities];
+
+    const parsedNew = parseTime(timeEditInput);
+    const bufferMin = 15;
+
+    const duration = Math.max(15, parsedNew.duration);
+    let newStart = parsedNew.start;
+    const prevParsed = activityIndex > 0 ? parseTime(activities[activityIndex - 1].time) : null;
+    if (prevParsed && newStart < prevParsed.end + bufferMin) {
+      if (timeAdjustMode === "keep_following") return false;
+      newStart = prevParsed.end + bufferMin;
+    }
+
+    const newEnd = newStart + duration;
+    const normalizedTime = `${formatTime(newStart)} - ${formatTime(newEnd)}`;
+    activities[activityIndex] = { ...activities[activityIndex], time: normalizedTime };
+
+    if (timeAdjustMode === "keep_following") {
+      if (activityIndex < activities.length - 1) {
+        const nextParsed = parseTime(activities[activityIndex + 1].time);
+        if (nextParsed.start < newEnd) return false;
+      }
+    } else {
+      const preserveGaps = timeAdjustMode === "push_preserve_gaps";
+      let prevEnd = newEnd;
+      for (let i = activityIndex + 1; i < activities.length; i++) {
+        const curOld = originalActivities[i];
+        const curParsedOld = parseTime(curOld.time);
+        const duration = curParsedOld.duration;
+
+        let gap = 0;
+        if (preserveGaps) {
+          const prevOld = originalActivities[i - 1];
+          const prevParsedOld = parseTime(prevOld.time);
+          gap = Math.max(0, curParsedOld.start - prevParsedOld.end);
+          gap = Math.min(gap, 120);
+        }
+
+        const startTime = prevEnd + gap;
+        const endTime = startTime + duration;
+        activities[i] = {
+          ...activities[i],
+          time: `${formatTime(startTime)} - ${formatTime(endTime)}`,
+        };
+        prevEnd = endTime;
+      }
+    }
+
+    const newPlan = { ...tripPlan, days: [...tripPlan.days] };
+    newPlan.days[dayIndex] = { ...tripPlan.days[dayIndex], activities };
+    setTripPlan(newPlan);
+    localStorage.setItem("tripPlan", JSON.stringify(newPlan));
+    return true;
+  };
+
+  const openTimeline = (dayIndex: number, focusActivityId?: string | null) => {
+    if (!tripPlan) return;
+    const day = tripPlan.days?.[dayIndex];
+    if (!day) return;
+    const nextDraft: Record<string, { start: number; end: number; duration: number }> = {};
+    for (const a of day.activities || []) {
+      const id = a.client_id;
+      if (!id) continue;
+      const p = parseTime(a.time);
+      nextDraft[id] = { start: p.start, end: p.end, duration: p.duration };
+    }
+    setTimelineDraft(nextDraft);
+    setTimelineLocked({});
+    setTimelineFocusId(focusActivityId || null);
+    setTimelineDayIndex(dayIndex);
+    setIsTimelineOpen(true);
+  };
+
+  const closeTimeline = () => {
+    setIsTimelineOpen(false);
+    setTimelineDayIndex(null);
+    setTimelineDragging(null);
+    setTimelineFocusId(null);
+  };
+
+  const applyTimelineDraftToPlan = () => {
+    if (!tripPlan) return;
+    if (timelineDayIndex === null) return;
+    const day = tripPlan.days?.[timelineDayIndex];
+    if (!day) return;
+
+    // Normalize draft to prevent overlaps (preserve each duration, push down as needed)
+    const bufferMin = 15;
+    const dragStart = 6 * 60;
+    const dragEnd = 23 * 60;
+    const normalizedDraft = { ...timelineDraft };
+    let prevEnd: number | null = null;
+    for (const a of day.activities || []) {
+      const id = a.client_id;
+      if (!id) continue;
+      const d = normalizedDraft[id];
+      if (!d) continue;
+      const dur = Math.max(15, d.duration || (d.end - d.start));
+      let start = Math.max(dragStart, d.start);
+      if (prevEnd !== null) start = Math.max(start, prevEnd + bufferMin);
+      let end = start + dur;
+      if (end > dragEnd) {
+        end = dragEnd;
+        start = Math.min(start, end);
+      }
+      normalizedDraft[id] = { start, end, duration: Math.max(15, end - start) };
+      prevEnd = end;
+    }
+
+    const newPlan = { ...tripPlan, days: [...tripPlan.days] };
+    const newDay = { ...day, activities: [...day.activities] };
+    newDay.activities = newDay.activities.map((a) => {
+      const id = a.client_id;
+      if (!id) return a;
+      const draft = normalizedDraft[id];
+      if (!draft) return a;
+      return {
+        ...a,
+        time: `${formatTime(draft.start)} - ${formatTime(draft.end)}`,
+      };
+    });
+    newPlan.days[timelineDayIndex] = newDay;
+    setTripPlan(newPlan);
+    localStorage.setItem("tripPlan", JSON.stringify(newPlan));
+    pushToast("success", language === "en" ? "Timeline updated." : "Đã cập nhật timeline.");
+    closeTimeline();
+  };
+
+  const toggleTimelineLock = (activityId: string) => {
+    setTimelineLocked((prev) => ({ ...prev, [activityId]: !prev[activityId] }));
+  };
+
+  const roundTo5 = useCallback(
+    (mins: number) => Math.round(mins / 5) * 5,
+    []
+  );
+
+  const autoAdjustTimeline = () => {
+    if (!tripPlan) return;
+    if (timelineDayIndex === null) return;
+    const day = tripPlan.days?.[timelineDayIndex];
+    if (!day) return;
+
+    const activities = day.activities || [];
+    const ids = activities.map((a) => a.client_id).filter((x): x is string => Boolean(x));
+    if (ids.length === 0) return;
+
+    const buffer = 15;
+    const dragStart = 6 * 60;
+    const dragEnd = 23 * 60;
+
+    // Validate locked anchors don't overlap.
+    let prevLockedEnd: number | null = null;
+    for (let i = 0; i < activities.length; i++) {
+      const id = activities[i].client_id;
+      if (!id || !timelineLocked[id]) continue;
+      const d = timelineDraft[id];
+      if (!d) continue;
+      if (prevLockedEnd !== null && d.start < prevLockedEnd + buffer) {
+        pushToast(
+          "error",
+          language === "en"
+            ? "Auto adjust failed: locked activities overlap."
+            : "Không thể tự động điều chỉnh vì các hoạt động bị khóa đang trùng nhau."
+        );
+        return;
+      }
+      prevLockedEnd = d.end;
+    }
+
+    const clampStart = (v: number) => Math.min(dragEnd - 15, Math.max(dragStart, v));
+    const clampEnd = (v: number) => Math.min(dragEnd, Math.max(dragStart + 15, v));
+
+    // Derive a reasonable day range from current draft; then clamp to window.
+    const starts = ids.map((id) => timelineDraft[id]?.start).filter((x): x is number => Number.isFinite(x));
+    const ends = ids.map((id) => timelineDraft[id]?.end).filter((x): x is number => Number.isFinite(x));
+    const dayStart = clampStart(starts.length ? Math.min(...starts) : 8 * 60);
+    const dayEnd = clampEnd(ends.length ? Math.max(...ends) : 20 * 60);
+
+    const nextDraft = { ...timelineDraft };
+
+    const scheduleSegment = (
+      segStart: number,
+      segEnd: number,
+      indices: number[],
+      prevAnchor: boolean,
+      nextAnchor: boolean
+    ) => {
+      if (indices.length === 0) return true;
+      const buffers =
+        (indices.length - 1) + (prevAnchor ? 1 : 0) + (nextAnchor ? 1 : 0);
+      const available = segEnd - segStart - buffers * buffer;
+      if (available <= 0) return false;
+
+      const durations = indices.map((idx) => {
+        const id = activities[idx].client_id;
+        if (!id) return 0;
+        return nextDraft[id]?.duration ?? parseTime(activities[idx].time).duration;
+      });
+      const total = durations.reduce((a, b) => a + b, 0);
+      const rawScale = total > 0 ? available / total : 1;
+      const scale = Math.min(2, Math.max(0.5, rawScale));
+
+      let t = segStart + (prevAnchor ? buffer : 0);
+      for (let k = 0; k < indices.length; k++) {
+        const idx = indices[k];
+        const id = activities[idx].client_id;
+        if (!id) continue;
+        const baseDur = durations[k] || 120;
+        const dur = Math.max(15, roundTo5(baseDur * scale));
+        const start = t;
+        const end = t + dur;
+        nextDraft[id] = { start, end, duration: dur };
+        t = end;
+        if (k < indices.length - 1) t += buffer;
+        else if (nextAnchor) t += buffer;
+      }
+      return t <= segEnd;
+    };
+
+    // Segment by locked activities (in list order)
+    let prevEnd = dayStart;
+    let prevAnchor = false;
+    let lastIndex = -1;
+    for (let i = 0; i < activities.length; i++) {
+      const id = activities[i].client_id;
+      if (!id || !timelineLocked[id]) continue;
+      const locked = nextDraft[id];
+      if (!locked) continue;
+
+      const segment = [] as number[];
+      for (let j = lastIndex + 1; j < i; j++) {
+        const jid = activities[j].client_id;
+        if (!jid) continue;
+        if (timelineLocked[jid]) continue;
+        segment.push(j);
+      }
+
+      const ok = scheduleSegment(prevEnd, locked.start, segment, prevAnchor, true);
+      if (!ok) {
+        pushToast(
+          "error",
+          language === "en"
+            ? "Auto adjust failed: not enough space between locked activities."
+            : "Không thể tự động điều chỉnh: không đủ thời gian giữa các hoạt động bị khóa."
+        );
+        return;
+      }
+
+      prevEnd = locked.end;
+      prevAnchor = true;
+      lastIndex = i;
+    }
+
+    const tail = [] as number[];
+    for (let j = lastIndex + 1; j < activities.length; j++) {
+      const jid = activities[j].client_id;
+      if (!jid) continue;
+      if (timelineLocked[jid]) continue;
+      tail.push(j);
+    }
+    const okTail = scheduleSegment(prevEnd, dayEnd, tail, prevAnchor, false);
+    if (!okTail) {
+      pushToast(
+        "error",
+        language === "en" ? "Auto adjust failed." : "Không thể tự động điều chỉnh."
+      );
+      return;
+    }
+
+    setTimelineDraft(nextDraft);
+    pushToast(
+      "success",
+      language === "en" ? "Auto adjusted." : "Đã tự động điều chỉnh lịch trình."
+    );
+  };
+
+  useEffect(() => {
+    if (!timelineDragging) return;
+    const pxPerMin = 2;
+    const minDur = 15;
+    const dragStart = 6 * 60;
+    const dragEnd = 23 * 60;
+
+    const onMove = (e: PointerEvent) => {
+      const deltaY = e.clientY - timelineDragging.startY;
+      const deltaMins = roundTo5(deltaY / pxPerMin);
+
+      setTimelineDraft((prev) => {
+        const current = prev[timelineDragging.activityId];
+        if (!current) return prev;
+        let start = timelineDragging.originStart;
+        let end = timelineDragging.originEnd;
+
+        if (timelineDragging.action === "move") {
+          const duration = Math.max(minDur, end - start);
+          start = start + deltaMins;
+          end = start + duration;
+        } else {
+          if (timelineDragging.edge === "top") {
+            start = Math.min(end - minDur, start + deltaMins);
+          } else {
+            end = Math.max(start + minDur, end + deltaMins);
+          }
+        }
+        start = Math.max(dragStart, Math.min(dragEnd - minDur, start));
+        end = Math.max(start + minDur, Math.min(dragEnd, end));
+        const duration = end - start;
+        return { ...prev, [timelineDragging.activityId]: { start, end, duration } };
+      });
+    };
+
+    const onUp = () => {
+      setTimelineDragging(null);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [timelineDragging, roundTo5]);
+
+  useEffect(() => {
+    if (!isTimelineOpen) return;
+    if (!timelineFocusId) return;
+
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`timeline-item-${timelineFocusId}`);
+      if (el) {
+        try {
+          el.scrollIntoView({ block: "center" });
+        } catch {
+          // ignore
+        }
+      }
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, [isTimelineOpen, timelineFocusId]);
 
   const handleSavePlan = async () => {
     if (!tripPlan?.trip_id) return;
@@ -738,7 +1415,7 @@ export default function TripPlanPage() {
 
       const token = await getIdToken?.();
       if (!token) {
-        alert(language === "en" ? "You need to sign in to save." : "Bạn cần đăng nhập để lưu.");
+        pushToast("error", language === "en" ? "You need to sign in to save." : "Bạn cần đăng nhập để lưu.");
         return;
       }
 
@@ -756,10 +1433,38 @@ export default function TripPlanPage() {
         throw new Error(data?.error || "Failed to save plan");
       }
 
-      alert(language === "en" ? "Saved successfully." : "Đã lưu kế hoạch.");
+      // Refresh from backend to ensure persisted version matches dirty snapshot.
+      const refreshResp = await fetch(`/api/trip/${tripPlan.trip_id}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      });
+      const refreshed = await refreshResp.json().catch(() => null);
+      if (refreshResp.ok && refreshed && typeof refreshed === "object") {
+        const refreshedPlanRaw = (refreshed as any)?.trip_plan;
+        if (refreshedPlanRaw && typeof refreshedPlanRaw === "object") {
+          const nextPlan: TripPlan = ensureActivityIds({
+            ...(refreshedPlanRaw as TripPlan),
+            trip_id: tripPlan.trip_id,
+            cover_image: (refreshed as any)?.cover_image || (refreshedPlanRaw as any)?.cover_image,
+          });
+          setTripPlan(nextPlan);
+          localStorage.setItem("tripPlan", JSON.stringify(nextPlan));
+          savedSnapshotRef.current = JSON.stringify(nextPlan);
+        } else {
+          savedSnapshotRef.current = JSON.stringify(tripPlan);
+        }
+      } else {
+        savedSnapshotRef.current = JSON.stringify(tripPlan);
+      }
+
+      pushToast("success", language === "en" ? "Saved successfully." : "Đã lưu kế hoạch.");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      alert(language === "en" ? `Save failed: ${msg}` : `Lưu thất bại: ${msg}`);
+      pushToast("error", language === "en" ? `Save failed: ${msg}` : `Lưu thất bại: ${msg}`);
     } finally {
       setSavingPlan(false);
     }
@@ -778,11 +1483,25 @@ export default function TripPlanPage() {
     const newIndex = currentActivities.findIndex((a) => a.client_id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
+    const moved = arrayMove(currentActivities, oldIndex, newIndex);
+    const bufferMin = 15;
+    const starts = moved.map((a) => parseTime(a.time).start).filter((n) => Number.isFinite(n));
+    const baseStart = starts.length ? Math.min(...starts) : 8 * 60;
+    let t = baseStart;
+    const normalized = moved.map((a) => {
+      const p = parseTime(a.time);
+      const dur = Math.max(15, p.duration);
+      const start = t;
+      const end = start + dur;
+      t = end + bufferMin;
+      return { ...a, time: `${formatTime(start)} - ${formatTime(end)}` };
+    });
+
     const newPlan = { ...tripPlan };
     newPlan.days = [...newPlan.days];
     newPlan.days[dayIndex] = {
       ...newPlan.days[dayIndex],
-      activities: arrayMove(currentActivities, oldIndex, newIndex),
+      activities: normalized,
     };
     
     setTripPlan(newPlan);
@@ -804,11 +1523,25 @@ export default function TripPlanPage() {
     const newIndex = currentActivities.findIndex((a) => a.client_id === overId);
     if (oldIndex === -1 || newIndex === -1) return;
 
+    const moved = arrayMove(currentActivities, oldIndex, newIndex);
+    const bufferMin = 15;
+    const starts = moved.map((a) => parseTime(a.time).start).filter((n) => Number.isFinite(n));
+    const baseStart = starts.length ? Math.min(...starts) : 8 * 60;
+    let t = baseStart;
+    const normalized = moved.map((a) => {
+      const p = parseTime(a.time);
+      const dur = Math.max(15, p.duration);
+      const start = t;
+      const end = start + dur;
+      t = end + bufferMin;
+      return { ...a, time: `${formatTime(start)} - ${formatTime(end)}` };
+    });
+
     const newPlan = { ...tripPlan };
     newPlan.days = [...newPlan.days];
     newPlan.days[dayIndex] = {
       ...newPlan.days[dayIndex],
-      activities: arrayMove(currentActivities, oldIndex, newIndex),
+      activities: normalized,
     };
 
     setTripPlan(newPlan);
@@ -911,7 +1644,51 @@ export default function TripPlanPage() {
     }
   };
 
-  const handleDeleteActivity = (dayIndex: number, activityIndex: number) => {
+  const fetchSuggestionsForActivity = async (dayIndex: number, activityIndex: number) => {
+    if (!tripPlan) return;
+    const activity = tripPlan.days?.[dayIndex]?.activities?.[activityIndex];
+    const activityId = activity?.client_id;
+    if (!activityId) return;
+    if (suggestingActivityIds[activityId]) return;
+    if (suggestionsByActivityId[activityId]?.length) return;
+
+    try {
+      setSuggestingActivityIds((prev) => ({ ...prev, [activityId]: true }));
+
+      const destination = (tripParams?.destination || "").trim();
+      const locationCoords = averageCoordsFromDay(tripPlan.days?.[dayIndex]);
+      const placeTypeHint = isHotelLikeQuery(activity?.place || "") ? "lodging" : undefined;
+
+      const response = await fetch("/api/trip/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destination,
+          location_coords: locationCoords,
+          place_type_hint: placeTypeHint,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to fetch suggestions");
+      }
+
+      const raw = Array.isArray(data?.suggestions) ? (data.suggestions as PlaceDetails[]) : [];
+      const decorated = decorateSuggestionsWithAds(activityId, raw);
+      setSuggestionsByActivityId((prev) => ({ ...prev, [activityId]: decorated }));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSuggestingActivityIds((prev) => ({ ...prev, [activityId]: false }));
+    }
+  };
+
+  const handlePickSuggestion = async (
+    dayIndex: number,
+    activityIndex: number,
+    suggestion: PlaceSuggestion
+  ) => {
     if (!tripPlan) return;
 
     const newPlan = { ...tripPlan };
@@ -920,10 +1697,23 @@ export default function TripPlanPage() {
       ...newPlan.days[dayIndex],
       activities: [...newPlan.days[dayIndex].activities],
     };
-    newPlan.days[dayIndex].activities.splice(activityIndex, 1);
-    
+
+    const current = newPlan.days[dayIndex].activities[activityIndex];
+    newPlan.days[dayIndex].activities[activityIndex] = {
+      ...current,
+      place: suggestion.name || current.place,
+      place_details: {
+        ...(current.place_details || {}),
+        ...suggestion,
+      },
+      _isNew: false,
+    };
+
     setTripPlan(newPlan);
     localStorage.setItem("tripPlan", JSON.stringify(newPlan));
+
+    // Enrich with full resolve data (description/cost/tips), using the chosen place name.
+    await handleResolvePlace(dayIndex, activityIndex, suggestion.name || current.place);
   };
 
   const handleEditActivity = (
@@ -965,7 +1755,7 @@ export default function TripPlanPage() {
       <div className="navbar bg-white shadow-md sticky top-0 z-50">
         <div className="navbar-start">
           <button
-              onClick={() => router.push(backHref || "/trip/input")}
+              onClick={requestLeave}
             className="btn btn-ghost"
           >
               {backLabel || t("plan.back")}
@@ -1201,11 +1991,28 @@ export default function TripPlanPage() {
               <div className="mt-4">
                 <div className="card bg-white shadow-lg mobile-compact">
                   <div className="card-body p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                      </svg>
-                      <h3 className="text-base font-bold text-gray-800">{language === "en" ? "Route" : "Lộ trình"}</h3>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        </svg>
+                        <h3 className="text-base font-bold text-gray-800">{language === "en" ? "Route" : "Lộ trình"}</h3>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-outline"
+                        onClick={() => {
+                          const idx = tripPlan.days.findIndex((d) => d.day === selectedDay);
+                          if (idx >= 0) openTimeline(idx);
+                        }}
+                        title={
+                          language === "en"
+                            ? "Open day timeline"
+                            : "Mở timeline theo ngày"
+                        }
+                      >
+                        {language === "en" ? "Timeline" : "Timeline"}
+                      </button>
                     </div>
                     <div className="text-xs text-gray-500 mb-2">{t("plan.dragToReorder")}</div>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRouteDragEnd}>
@@ -1378,20 +2185,27 @@ export default function TripPlanPage() {
                     <h2 className="text-2xl font-bold mobile-heading">
                       {language === "en" ? `Day ${currentDay.day}` : `Ngày ${currentDay.day}`}
                     </h2>
-                    <div className="badge badge-outline font-bold text-blue-700 border-blue-700">
-                      {language === "en"
-                        ? `Total cost: ${formatVndNumber(
-                            currentDay.activities.reduce(
-                              (acc, a) => acc + vndMidpoint(a.estimated_cost),
-                              0
-                            )
-                          )} đ`
-                        : `Tổng chi phí: ${formatVndNumber(
-                            currentDay.activities.reduce(
-                              (acc, a) => acc + vndMidpoint(a.estimated_cost),
-                              0
-                            )
-                          )} đ`}
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="badge badge-outline font-bold text-blue-700 border-blue-700 whitespace-nowrap">
+                        {language === "en"
+                          ? `Total cost: ${formatVndNumber(
+                              currentDay.activities.reduce(
+                                (acc, a) => acc + vndMidpoint(a.estimated_cost),
+                                0
+                              )
+                            )} đ`
+                          : `Tổng chi phí: ${formatVndNumber(
+                              currentDay.activities.reduce(
+                                (acc, a) => acc + vndMidpoint(a.estimated_cost),
+                                0
+                              )
+                            )} đ`}
+                      </div>
+                      <div className="badge badge-outline font-bold text-red-700 border-red-700 whitespace-nowrap">
+                        {language === "en"
+                          ? `Total distance: ${formatKm(dayTotalDistanceKm(currentDay))}`
+                          : `Tổng quãng đường: ${formatKm(dayTotalDistanceKm(currentDay))}`}
+                      </div>
                     </div>
                   </div>
                   <div className="divider"></div>
@@ -1428,7 +2242,7 @@ export default function TripPlanPage() {
                                     </svg>
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteActivity(dayIndex, activityIdx)}
+                                    onClick={() => requestDeleteActivity(dayIndex, activityIdx)}
                                     className="btn btn-xs btn-circle btn-outline btn-ghost text-red-600 border-red-300"
                                     title="Xoá"
                                   >
@@ -1448,6 +2262,19 @@ export default function TripPlanPage() {
                               dayIndex={dayIndex}
                               isEditing={isEditing}
                               isModalOpen={isTimeEditOpen}
+                              suggestions={
+                                suggestionsByActivityId[activity.client_id!] || []
+                              }
+                              suggestionsLoading={
+                                Boolean(suggestingActivityIds[activity.client_id!])
+                              }
+                              existingPlaceKeys={buildExistingPlaceKeySet(currentDay.activities, activityIdx)}
+                              onRequestSuggestions={() =>
+                                fetchSuggestionsForActivity(dayIndex, activityIdx)
+                              }
+                              onPickSuggestion={(s) =>
+                                handlePickSuggestion(dayIndex, activityIdx, s)
+                              }
                               onEdit={(field, value) =>
                                 handleEditActivity(dayIndex, activityIdx, field, value)
                               }
@@ -1458,7 +2285,7 @@ export default function TripPlanPage() {
                                 setEditingActivity({ dayIndex, activityIndex: activityIdx })
                               }
                               onFinishEdit={() => setEditingActivity(null)}
-                              onDelete={() => handleDeleteActivity(dayIndex, activityIdx)}
+                              onDelete={() => requestDeleteActivity(dayIndex, activityIdx)}
                               onResolvePlace={(q) => handleResolvePlace(dayIndex, activityIdx, q)}
                               isResolving={Boolean(activity.client_id && resolvingActivityIds[activity.client_id])}
                               t={t}
@@ -1507,11 +2334,28 @@ export default function TripPlanPage() {
               className="bg-white rounded-lg shadow-xl p-5 max-w-sm w-full mx-4 pointer-events-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <h3 className="text-lg font-bold">Chỉnh sửa thời gian</h3>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="text-lg font-bold">{language === "en" ? "Edit time" : "Chỉnh sửa thời gian"}</h3>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-outline"
+                  onClick={() => {
+                    openTimeline(timeEditTarget.dayIndex);
+                    closeTimeEdit();
+                  }}
+                  title={
+                    language === "en"
+                      ? "Open day timeline"
+                      : "Mở timeline theo ngày"
+                  }
+                >
+                  {language === "en" ? "Timeline" : "Timeline"}
+                </button>
               </div>
               <input
                 type="text"
@@ -1523,8 +2367,8 @@ export default function TripPlanPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    handleEditActivity(timeEditTarget.dayIndex, timeEditTarget.activityIndex, "time", timeEditInput);
-                    closeTimeEdit();
+                    const ok = applyTimeEdit();
+                    if (ok) closeTimeEdit();
                   }
                   if (e.key === "Escape") {
                     e.preventDefault();
@@ -1532,13 +2376,84 @@ export default function TripPlanPage() {
                   }
                 }}
               />
+              <div className="mb-3">
+                {/* <div className="text-xs font-semibold text-gray-600 mb-2">Tự động điều chỉnh</div>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      className="radio radio-sm"
+                      checked={timeAdjustMode === "push_preserve_gaps"}
+                      onChange={() => setTimeAdjustMode("push_preserve_gaps")}
+                    />
+                    <span>Đẩy các điểm sau (giữ khoảng trống)</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      className="radio radio-sm"
+                      checked={timeAdjustMode === "push_compact"}
+                      onChange={() => setTimeAdjustMode("push_compact")}
+                    />
+                    <span>Đẩy các điểm sau (nén lịch, không khoảng trống)</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      className="radio radio-sm"
+                      checked={timeAdjustMode === "keep_following"}
+                      onChange={() => setTimeAdjustMode("keep_following")}
+                    />
+                    <span>Chỉ đổi điểm này (không thay đổi các điểm sau)</span>
+                  </label>
+                </div> */}
+
+                {(!isValidTimeRangeText(timeEditInput) ||
+                  (timeAdjustMode === "keep_following" && (() => {
+                    try {
+                      const day = tripPlan?.days?.[timeEditTarget.dayIndex];
+                      const activities = day?.activities || [];
+                      const parsed = parseTime(timeEditInput);
+                      if (timeEditTarget.activityIndex < activities.length - 1) {
+                        const nextParsed = parseTime(activities[timeEditTarget.activityIndex + 1].time);
+                        return nextParsed.start < parsed.end;
+                      }
+                      return false;
+                    } catch {
+                      return false;
+                    }
+                  })())) && (
+                  <div className="mt-2 text-xs text-red-600 font-semibold">
+                    {!isValidTimeRangeText(timeEditInput)
+                      ? "Sai định dạng. VD: 08:00 - 10:00"
+                      : "Bị trùng thời gian với hoạt động tiếp theo. Hãy chọn chế độ đẩy các điểm sau."}
+                  </div>
+                )}
+              </div>
               <div className="flex items-center justify-end gap-2">
                 <button
                   className="btn btn-sm btn-primary"
                   onClick={() => {
-                    handleEditActivity(timeEditTarget.dayIndex, timeEditTarget.activityIndex, "time", timeEditInput);
-                    closeTimeEdit();
+                    const ok = applyTimeEdit();
+                    if (ok) closeTimeEdit();
                   }}
+                  disabled={
+                    !isValidTimeRangeText(timeEditInput) ||
+                    (timeAdjustMode === "keep_following" && (() => {
+                      try {
+                        const day = tripPlan?.days?.[timeEditTarget.dayIndex];
+                        const activities = day?.activities || [];
+                        const parsed = parseTime(timeEditInput);
+                        if (timeEditTarget.activityIndex < activities.length - 1) {
+                          const nextParsed = parseTime(activities[timeEditTarget.activityIndex + 1].time);
+                          return nextParsed.start < parsed.end;
+                        }
+                        return false;
+                      } catch {
+                        return false;
+                      }
+                    })())
+                  }
                 >
                   Lưu
                 </button>
@@ -1546,6 +2461,332 @@ export default function TripPlanPage() {
                   Huỷ
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {confirmLeaveOpen && (
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[999996]"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setConfirmLeaveOpen(false)}
+          >
+            <div
+              className="bg-white rounded-lg shadow-xl p-5 max-w-sm w-full mx-4 pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-bold mb-2">
+                {language === "en" ? "Unsaved changes" : "Chưa lưu thay đổi"}
+              </h3>
+              <div className="text-sm text-gray-600">
+                {language === "en"
+                  ? "You have unsaved changes. Leave without saving?"
+                  : "Bạn đang có thay đổi chưa lưu. Bạn có muốn thoát mà không lưu?"}
+              </div>
+              <div className="flex items-center justify-end gap-2 mt-4">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => setConfirmLeaveOpen(false)}
+                >
+                  {language === "en" ? "Stay" : "Ở lại"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-error"
+                  onClick={() => {
+                    setConfirmLeaveOpen(false);
+                    const target = pathname.includes("/edit-plan") && tripPlan?.trip_id
+                      ? `/trip/${tripPlan.trip_id}`
+                      : "/";
+                    router.push(target);
+                  }}
+                >
+                  {language === "en" ? "Leave" : "Thoát"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {toast && (
+          <div className="fixed top-4 right-4 z-[1000000]">
+            <div
+              className={`alert shadow-lg ${
+                toast.type === "success"
+                  ? "alert-success"
+                  : toast.type === "error"
+                    ? "alert-error"
+                    : "alert-info"
+              }`}
+              role="status"
+            >
+              <span className="text-sm">{toast.message}</span>
+            </div>
+          </div>
+        )}
+
+        {confirmDeleteTarget && (
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[999998]"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setConfirmDeleteTarget(null)}
+          >
+            <div
+              className="bg-white rounded-lg shadow-xl p-5 max-w-sm w-full mx-4 pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-bold mb-2">
+                {language === "en" ? "Delete activity" : "Xoá hoạt động"}
+              </h3>
+              <div className="text-sm text-gray-600">
+                {language === "en"
+                  ? "This action cannot be undone."
+                  : "Hành động này không thể hoàn tác."}
+              </div>
+              <div className="flex items-center justify-end gap-2 mt-4">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => setConfirmDeleteTarget(null)}
+                >
+                  {language === "en" ? "Cancel" : "Huỷ"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-error"
+                  onClick={performDeleteActivity}
+                >
+                  {language === "en" ? "Delete" : "Xoá"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isTimelineOpen && timelineDayIndex !== null && tripPlan?.days?.[timelineDayIndex] && (
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[999997]"
+            role="dialog"
+            aria-modal="true"
+            onClick={closeTimeline}
+          >
+            <div
+              className="bg-white rounded-lg shadow-xl p-5 max-w-4xl w-full mx-4 pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <h3 className="text-lg font-bold">
+                    {language === "en"
+                      ? `Timeline — Day ${tripPlan.days[timelineDayIndex].day}`
+                      : `Timeline — Ngày ${tripPlan.days[timelineDayIndex].day}`}
+                  </h3>
+                  <div className="text-xs text-gray-600 mt-1">
+                    {language === "en"
+                      ? "Drag blocks to move. Drag top/bottom edge to resize."
+                      : "Kéo khối để dời giờ. Kéo mép trên/dưới để đổi giờ."}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    onClick={autoAdjustTimeline}
+                    title={
+                      language === "en"
+                        ? "Auto adjust scales time blocks to fit the day and keeps locked activities fixed."
+                        : "Tự động điều chỉnh sẽ co/giãn thời lượng để vừa khung ngày và giữ nguyên các hoạt động đã khóa."
+                    }
+                  >
+                    {language === "en" ? "Auto adjust" : "Tự động điều chỉnh"}
+                  </button>
+                  <button type="button" className="btn btn-sm btn-primary" onClick={applyTimelineDraftToPlan}>
+                    {language === "en" ? "Save" : "Lưu"}
+                  </button>
+                  <button type="button" className="btn btn-sm btn-outline btn-primary" onClick={closeTimeline}>
+                    {language === "en" ? "Close" : "Đóng"}
+                  </button>
+                </div>
+              </div>
+
+              {(() => {
+                const pxPerMin = 2;
+                const windowStart = 6 * 60;
+                const windowEnd = 23 * 60;
+                const gridHeight = (windowEnd - windowStart) * pxPerMin;
+                const day = tripPlan.days[timelineDayIndex];
+                const hours = [] as number[];
+                for (let h = 6; h <= 23; h++) hours.push(h);
+
+                return (
+                  <div className="border rounded-lg bg-gray-50 max-h-[65vh] overflow-y-auto">
+                    <div className="flex">
+                      <div className="relative w-14 flex-shrink-0">
+                        <div className="relative" style={{ height: gridHeight }}>
+                          {hours.map((h) => {
+                            const top = (h * 60 - windowStart) * pxPerMin;
+                            return (
+                              <div
+                                key={h}
+                                className="absolute right-2 text-[11px] text-gray-500"
+                                style={{ top: top - 6 }}
+                              >
+                                {String(h).padStart(2, "0")}:00
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="relative flex-1 border-l" style={{ height: gridHeight }}>
+                        {hours.map((h) => {
+                          const top = (h * 60 - windowStart) * pxPerMin;
+                          return (
+                            <div
+                              key={`line-${h}`}
+                              className="absolute left-0 right-0 border-t border-gray-200"
+                              style={{ top }}
+                            />
+                          );
+                        })}
+
+                        {(day.activities || []).map((a, activityIndex) => {
+                          const id = a.client_id;
+                          if (!id) return null;
+                          const draft = timelineDraft[id];
+                          if (!draft) return null;
+
+                          const top = (draft.start - windowStart) * pxPerMin;
+                          const height = Math.max(30, draft.duration * pxPerMin);
+                          const isLocked = Boolean(timelineLocked[id]);
+                          const isFocused = timelineFocusId === id;
+
+                          return (
+                            <div
+                              key={id}
+                              id={`timeline-item-${id}`}
+                              className={`absolute left-3 right-3 rounded-lg shadow-sm border select-none ${
+                                isLocked
+                                  ? "bg-gray-100 border-gray-300"
+                                  : "bg-blue-50 border-blue-300"
+                              } ${isFocused ? "ring-2 ring-blue-500" : ""}`}
+                              style={{ top, height }}
+                            >
+                              <div
+                                className="absolute left-0 right-0 top-0 h-2 cursor-ns-resize"
+                                onPointerDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setTimelineDragging({
+                                    activityId: id,
+                                    action: "resize",
+                                    edge: "top",
+                                    startY: e.clientY,
+                                    originStart: draft.start,
+                                    originEnd: draft.end,
+                                  });
+                                }}
+                                title={
+                                  language === "en"
+                                    ? "Drag to change start time"
+                                    : "Kéo để đổi giờ bắt đầu"
+                                }
+                              />
+
+                              <div
+                                className="h-full cursor-grab active:cursor-grabbing"
+                                onPointerDown={(e) => {
+                                  // Only drag with primary button and not from resize handles.
+                                  if (e.button !== 0) return;
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setTimelineFocusId(id);
+                                  setTimelineDragging({
+                                    activityId: id,
+                                    action: "move",
+                                    startY: e.clientY,
+                                    originStart: draft.start,
+                                    originEnd: draft.end,
+                                  });
+                                }}
+                              >
+                                <div className="flex items-start justify-between gap-2 px-3 py-2">
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-semibold text-gray-700">
+                                      {formatTime(draft.start)} - {formatTime(draft.end)}
+                                    </div>
+                                    <div className="text-sm font-bold text-gray-900 truncate">
+                                      {a.place || (language === "en" ? "Untitled" : "Chưa đặt tên")}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      className="btn btn-xs btn-outline"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        openTimeEditText(
+                                          timelineDayIndex,
+                                          activityIndex,
+                                          `${formatTime(draft.start)} - ${formatTime(draft.end)}`
+                                        );
+                                      }}
+                                      title={language === "en" ? "Edit as text" : "Sửa theo dạng text"}
+                                    >
+                                      {language === "en" ? "Edit" : "Sửa"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`btn btn-xs ${isLocked ? "btn-neutral" : "btn-ghost"}`}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        toggleTimelineLock(id);
+                                      }}
+                                      title={
+                                        language === "en"
+                                          ? "Lock keeps this activity fixed during Auto adjust."
+                                          : "Khóa sẽ giữ nguyên hoạt động này khi Tự động điều chỉnh."
+                                      }
+                                    >
+                                      {language === "en" ? "Lock" : "Khóa"}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div
+                                className="absolute left-0 right-0 bottom-0 h-2 cursor-ns-resize"
+                                onPointerDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setTimelineDragging({
+                                    activityId: id,
+                                    action: "resize",
+                                    edge: "bottom",
+                                    startY: e.clientY,
+                                    originStart: draft.start,
+                                    originEnd: draft.end,
+                                  });
+                                }}
+                                title={
+                                  language === "en"
+                                    ? "Drag to change end time"
+                                    : "Kéo để đổi giờ kết thúc"
+                                }
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}

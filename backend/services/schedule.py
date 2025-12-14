@@ -156,3 +156,24 @@ def apply_time_buffers(trip_plan: dict[str, Any], *,
             current_end = end
 
     return trip_plan
+
+
+def cap_activities_per_day(trip_plan: dict[str, Any], *, max_per_day: int = 8) -> dict[str, Any]:
+    """Cap number of activities per day to avoid overly dense itineraries."""
+    if not isinstance(max_per_day, int) or max_per_day <= 0:
+        return trip_plan
+
+    days = trip_plan.get("days")
+    if not isinstance(days, list):
+        return trip_plan
+
+    for day in days:
+        if not isinstance(day, dict):
+            continue
+        activities = day.get("activities")
+        if not isinstance(activities, list):
+            continue
+        if len(activities) > max_per_day:
+            day["activities"] = activities[:max_per_day]
+
+    return trip_plan

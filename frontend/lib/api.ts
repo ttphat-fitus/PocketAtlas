@@ -1,12 +1,13 @@
-// API Configuration
-// Use environment variable or fallback to localhost for development
+// Client-side API helper.
+// IMPORTANT: Client code must call Next.js route handlers under /api (proxy to backend).
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+export const API_BASE_URL = "/api";
 
-// Helper function to build API URLs
 export const getApiUrl = (path: string): string => {
-  // Ensure path starts with /
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (normalizedPath === "/api" || normalizedPath.startsWith("/api/")) {
+    return normalizedPath;
+  }
   return `${API_BASE_URL}${normalizedPath}`;
 };
 

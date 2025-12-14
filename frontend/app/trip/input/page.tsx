@@ -9,8 +9,15 @@ type BudgetLevel = "low" | "medium" | "high";
 type ActivityLevel = "low" | "medium" | "high";
 type TravelGroup = "solo" | "couple" | "family" | "friends";
 
+function toLocalISO(d: Date) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function todayISO() {
-  return new Date().toISOString().split("T")[0];
+  return toLocalISO(new Date());
 }
 
 function toDateAtMidnight(dateISO: string) {
@@ -21,7 +28,7 @@ function toDateAtMidnight(dateISO: string) {
 function addDaysISO(dateISO: string, days: number) {
   const d = toDateAtMidnight(dateISO);
   d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
+  return toLocalISO(d);
 }
 
 function formatDisplayDate(dateISO: string) {
@@ -224,7 +231,7 @@ export default function TripInputPage() {
     if (categories.length > 0) lines.push(`Danh mục: ${categories.join(", ")}`);
     if (journeyStart && journeyEnd)
       lines.push(
-        `Thời gian: ${formatDisplayDate(journeyStart)} → ${formatDisplayDate(journeyEnd)} (${duration} ngày)`
+        `Thời gian: ${formatDisplayDate(journeyStart)} - ${formatDisplayDate(journeyEnd)} (${duration} ngày)`
       );
     return lines.join("\n");
   }, [
@@ -445,7 +452,7 @@ export default function TripInputPage() {
               onClick={() => router.push("/")}
               className="btn btn-ghost text-lg"
             >
-              ← Quay lại
+              <span>← Quay lại</span>
             </button>
           </div>
           <div className="navbar-center">
@@ -727,7 +734,7 @@ export default function TripInputPage() {
                               d.getMonth() === month;
                               d.setDate(d.getDate() + 1)
                             ) {
-                              const iso = d.toISOString().split("T")[0];
+                              const iso = toLocalISO(d);
                               days.push({
                                 kind: "day",
                                 iso,
@@ -1466,7 +1473,7 @@ export default function TripInputPage() {
             )}
 
             <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-              <Tip text="Quay lại trang chủ." position="tooltip-top">
+              <Tip text="← Quay lại trang chủ." position="tooltip-top">
                 <button
                   type="button"
                   className="btn btn-ghost"

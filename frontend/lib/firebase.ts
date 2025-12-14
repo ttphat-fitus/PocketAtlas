@@ -21,7 +21,7 @@ const isConfigured =
 
 if (!isConfigured && typeof window !== 'undefined') {
   console.error(
-    '❌ Firebase is not configured properly!\n\n' +
+    'Firebase is not configured properly!\n\n' +
     'Please follow these steps:\n' +
     '1. Go to Firebase Console: https://console.firebase.google.com\n' +
     '2. Select project: pocketatlas-0606\n' +
@@ -48,7 +48,7 @@ if (!getApps().length && isConfigured) {
   db = getFirestore(app);
 } else {
   // Create a dummy app for development without crashing
-  console.warn('⚠️  Running without Firebase - authentication will not work');
+  console.warn('Warning: running without Firebase - authentication will not work');
   app = {} as FirebaseApp;
   auth = {} as Auth;
   db = {} as Firestore;

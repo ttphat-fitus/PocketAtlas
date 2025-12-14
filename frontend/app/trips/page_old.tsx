@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -106,6 +106,31 @@ export default function MyTripsPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedTrip, setSelectedTrip] = useState<TripSummary | null>(null);
 
+  const [toast, setToast] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [pendingDeleteTripId, setPendingDeleteTripId] = useState<string | null>(null);
+
+  const pushToast = (type: "success" | "error" | "info", message: string) => {
+    setToast({ type, message });
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 2500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/auth");
@@ -124,7 +149,7 @@ export default function MyTripsPage() {
         throw new Error("Not authenticated");
       }
 
-      const response = await fetch("${process.env.NEXT_PUBLIC_BACKEND_URL}/api/my-trips", {
+      const response = await fetch("/api/trips", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -144,13 +169,19 @@ export default function MyTripsPage() {
   };
 
   const deleteTrip = async (tripId: string) => {
-    if (!confirm(language === "en" ? "Delete this trip?" : "Xóa chuyến đi này?")) {
-      return;
-    }
+    setPendingDeleteTripId(tripId);
+    setConfirmDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    const tripId = pendingDeleteTripId;
+    if (!tripId) return;
+    setConfirmDeleteOpen(false);
+    setPendingDeleteTripId(null);
 
     try {
       const token = await getIdToken();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/trip/${tripId}`, {
+      const response = await fetch(`/api/trip/${tripId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -162,8 +193,9 @@ export default function MyTripsPage() {
       }
 
       setTrips(trips.filter((t) => t.trip_id !== tripId));
+      pushToast("success", language === "en" ? "Trip deleted." : "Đã xóa chuyến đi.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete trip");
+      pushToast("error", err instanceof Error ? err.message : (language === "en" ? "Failed to delete trip" : "Không thể xóa chuyến đi"));
     }
   };
 
@@ -177,6 +209,50 @@ export default function MyTripsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-green-50">
+      {toast && (
+        <div className="fixed top-4 right-4 z-[1000000]">
+          <div
+            className={`alert shadow-lg ${
+              toast.type === "success"
+                ? "alert-success"
+                : toast.type === "error"
+                  ? "alert-error"
+                  : "alert-info"
+            }`}
+            role="status"
+          >
+            <span className="text-sm">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteOpen && (
+        <div className="fixed inset-0 z-[1000000] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <div className="text-lg font-semibold">
+              {language === "en" ? "Delete this trip?" : "Xóa chuyến đi này?"}
+            </div>
+            <div className="mt-2 text-sm text-gray-600">
+              {language === "en" ? "This action cannot be undone." : "Hành động này không thể hoàn tác."}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setConfirmDeleteOpen(false);
+                  setPendingDeleteTripId(null);
+                }}
+              >
+                {language === "en" ? "Cancel" : "Hủy"}
+              </button>
+              <button className="btn btn-error" onClick={confirmDelete}>
+                {language === "en" ? "Delete" : "Xóa"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="navbar bg-white shadow-sm">
         <div className="navbar-start">
           <a href="/" className="btn btn-ghost text-xl">

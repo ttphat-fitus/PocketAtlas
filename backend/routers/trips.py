@@ -14,7 +14,7 @@ from models.trip import (TripRequest, RatingRequest, ViewRequest,
                          CoverImageRequest, TogglePublicRequest, LikeRequest, UpdateTripPlanRequest)
 from services.ai import create_trip_planning_prompt
 from services.maps import async_geocode, enrich_activities_parallel, generate_booking_link
-from services.schedule import apply_time_buffers
+from services.schedule import apply_time_buffers, cap_activities_per_day
 from services.weather import get_weather_forecast_async
 from services.image import get_unsplash_image_async
 from services.podcast import podcast_service
@@ -51,6 +51,12 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         
         json_str = match.group(1) or match.group(2)
         trip_plan = json.loads(json_str)
+
+        # Cap activities/day before any scheduling adjustments.
+        try:
+            trip_plan = cap_activities_per_day(trip_plan, max_per_day=8)
+        except Exception as e:
+            print(f"[WARN] Could not cap activities per day: {e}")
 
         # Enforce buffer time between consecutive activities (deterministic post-process)
         try:
@@ -306,15 +312,33 @@ async def update_trip_plan(trip_id: str, payload: UpdateTripPlanRequest, user = 
         if isinstance(trip_plan, dict):
             trip_name = trip_plan.get("trip_name")
 
+            # Enforce backend constraints on saved plans.
+            try:
+                trip_plan = cap_activities_per_day(trip_plan, max_per_day=8)
+            except Exception as e:
+                print(f"[WARN] Could not cap activities per day on save: {e}")
+
+            try:
+                trip_plan = apply_time_buffers(
+                    trip_plan,
+                    active_time_start=8,
+                    active_time_end=22,
+                    travel_mode=trip_data.get("travel_mode"),
+                )
+            except Exception as e:
+                print(f"[WARN] Could not apply time buffers on save: {e}")
+
         update_data = {
             "trip_plan": trip_plan,
+            "active_time_start": 8,
+            "active_time_end": 22,
             "updated_at": datetime.now().isoformat(),
         }
         if trip_name:
             update_data["trip_name"] = trip_name
 
         trip_ref.update(update_data)
-        return JSONResponse(content={"message": "Trip plan updated"})
+        return JSONResponse(content={"message": "Trip plan updated", "trip_plan": trip_plan})
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": "Failed to update trip plan", "details": str(e)})
@@ -542,3 +566,27 @@ async def resolve_place(request: Request):
             status_code=500,
             content={"error": f"Failed to resolve place: {str(e)}"}
         )
+
+
+@router.post("/api/suggest-places")
+async def suggest_places(request: Request):
+    """Suggest nearby high-rated places to help users pick an option when adding an activity."""
+    try:
+        body = await request.json()
+        destination = (body.get("destination") or "").strip() or "Việt Nam"
+        location_coords = body.get("location_coords")
+        place_type_hint = body.get("place_type_hint")
+
+        from services.maps import get_place_suggestions_async
+
+        suggestions = await get_place_suggestions_async(
+            destination=destination,
+            location_coords=location_coords,
+            place_type_hint=place_type_hint,
+            limit=5,
+        )
+
+        return JSONResponse(content={"suggestions": suggestions})
+    except Exception as e:
+        print(f"Error suggesting places: {e}")
+        return JSONResponse(status_code=500, content={"error": f"Failed to suggest places: {str(e)}"})

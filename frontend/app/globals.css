@@ -97,3 +97,17 @@
   white-space: nowrap;
   white-space: normal;
 }
+
+/* Leaflet: keep map panes/controls below sticky navbars */
+.leaflet-container {
+  z-index: 0;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 20 !important;
+}
+
+.leaflet-control {
+  z-index: 20 !important;
+}
