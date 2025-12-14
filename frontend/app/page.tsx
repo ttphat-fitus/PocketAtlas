@@ -76,7 +76,7 @@ export default function LandingPage() {
             </div>
           ) : (
             <a href="/auth" className="btn btn-primary tap-target">
-              {language === "en" ? "Get Started" : "Bắt đầu"}
+              {language === "en" ? "Get Started" : "Đăng nhập"}
             </a>
           )}
         </div>
