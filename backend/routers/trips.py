@@ -72,35 +72,28 @@ def sanitize_trip_plan(trip_plan: dict) -> dict:
 
 @router.post("/api/plan-trip")
 async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)):
-    """Generate personalized travel itinerary"""
     try:
         start_time = time.time()
-        
-        print(f"\n{'='*60}")
         print(f"Trip Planning for: {trip_request.destination}")
         print(f"Duration: {trip_request.duration} days | Budget: {trip_request.budget}")
-        print(f"{'='*60}")
         
         trip_prompt = create_trip_planning_prompt(trip_request)
         
-        print("[INFO] Calling Gemini AI...")
+        print("[INFO] Gemini processing...")
         response = await model.generate_content_async(trip_prompt)
         raw_text = response.text.strip()
-        
-        print("[INFO] Parsing JSON response...")
         match = re.search(r'```json\s*(\{.*?\})\s*```|(\{.*?\})', raw_text, re.DOTALL)
         
         if not match:
             print("[ERROR] JSON not found in response")
             return JSONResponse(
                 status_code=500,
-                content={"error": "AI không trả về định dạng JSON hợp lệ", "raw": raw_text[:500]}
+                content={"error": "JSON not found in response", "raw": raw_text[:500]}
             )
         
         json_str = match.group(1) or match.group(2)
         trip_plan = json.loads(json_str)
 
-        # Remove AI travel-only rows like 'Di chuyển' before any enrichment/scheduling.
         try:
             trip_plan = sanitize_trip_plan(trip_plan)
         except Exception as e:
@@ -129,8 +122,8 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         forecasts = []
         try:
             from datetime import timedelta
-            start_date = datetime.strptime(trip_request.start_date, "%Y-%m-%d")
-            today = datetime.now()
+            start_date = datetime.strptime(trip_request.start_date, "%Y-%m-%d").date()
+            today = datetime.now().date()
             days_until_trip = (start_date - today).days
             
             if 0 <= days_until_trip <= 3:  # Only fetch weather for trips within 3 days
@@ -173,7 +166,7 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         
         trip_plan["weather_forecast"] = destination_weather
         
-        print("[INFO] Enriching activities with Google Places API (PARALLEL mode)...")
+        print("[INFO] Enriching activities with Google Places...")
         trip_plan = await enrich_activities_parallel(
             trip_plan, 
             trip_request.destination, 
@@ -188,7 +181,7 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         if user:
             trip_id = f"{user['uid']}_{int(datetime.now().timestamp())}"
             
-            print("[INFO] Fetching Unsplash cover image...")
+            # print("[INFO] Fetching Unsplash cover image...")
             cover_image_url = await get_unsplash_image_async(trip_request.destination)
             
             trip_data = {
@@ -225,9 +218,7 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
             trip_plan["cover_image"] = cover_image_url
         
         elapsed = time.time() - start_time
-        print(f"\n{'='*60}")
         print(f"[SUCCESS] Trip Planning completed in {elapsed:.2f} seconds")
-        print(f"{'='*60}\n")
         
         return JSONResponse(content=trip_plan)
     

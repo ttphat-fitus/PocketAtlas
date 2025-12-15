@@ -68,7 +68,7 @@ async def get_weather_forecast_async(lat: float, lng: float, days: int = 10) -> 
             "alerts": "no"
         }
         
-        print(f"[INFO] Fetching weather (async) for coordinates: {lat}, {lng}")
+        print(f"[INFO] Fetching weather for coordinates: {lat}, {lng}")
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.get(url, params=params)
             data = resp.json()
@@ -98,9 +98,6 @@ async def get_weather_forecast_async(lat: float, lng: float, days: int = 10) -> 
                 "is_sunny": is_sunny,
                 "suggestion": "Indoor activities recommended" if is_rainy else "Great for outdoor activities" if is_sunny else "Mixed activities suitable"
             })
-        
-        print(f"      Weather forecast (async): {len(forecasts)} days with detailed conditions")
-        
         return {"forecasts": forecasts}
     except Exception as e:
         print(f"Weather API error (async): {e}")

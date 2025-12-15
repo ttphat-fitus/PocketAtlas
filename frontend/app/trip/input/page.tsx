@@ -158,7 +158,7 @@ export default function TripInputPage() {
   const [travelGroup, setTravelGroup] = useState<TravelGroup>("solo");
   const [groupSize, setGroupSize] = useState<number>(1);
 
-  const [travelMode, setTravelMode] = useState<string>("Đi bộ");
+  const [travelMode, setTravelMode] = useState<string>("Xe máy");
   const [categories, setCategories] = useState<string[]>([]);
   const [otherOptions, setOtherOptions] = useState("");
 
@@ -272,7 +272,6 @@ export default function TripInputPage() {
 
   const travelModeOptions = useMemo(
     () => [
-      { value: "Đi bộ", tip: "Ưu tiên điểm gần nhau, phù hợp khu trung tâm." },
       { value: "Xe máy", tip: "Linh hoạt, phù hợp di chuyển trong nội thành." },
       { value: "Ô tô", tip: "Thoải mái, phù hợp nhóm/đi xa." },
       {

@@ -434,13 +434,13 @@ async def enrich_activities_parallel(trip_plan: dict, destination: str, batch_si
                 all_activities.append(activity)
     
     total_activities = len(all_activities)
-    print(f"Enriching {total_activities} activities in parallel batches of {batch_size}...")
+    #print(f"Enriching {total_activities} activities in parallel batches of {batch_size}...")
     
     for batch_start in range(0, total_activities, batch_size):
         batch_end = min(batch_start + batch_size, total_activities)
         batch = all_activities[batch_start:batch_end]
         
-        print(f"  Batch {batch_start // batch_size + 1}: Processing activities {batch_start + 1}-{batch_end}")
+        # print(f"  Batch {batch_start // batch_size + 1}: Processing activities {batch_start + 1}-{batch_end}")
         
         tasks = [
             get_place_details_async(activity.get("place", ""), destination, location_coords)
@@ -457,8 +457,6 @@ async def enrich_activities_parallel(trip_plan: dict, destination: str, batch_si
                 batch[i]["place_details"] = result
                 if result.get("address"):
                     print(f"    {batch[i].get('place', 'unknown')[:30]}...")
-    
-    print(f"Enriched {total_activities} activities successfully!")
     return trip_plan
 
 

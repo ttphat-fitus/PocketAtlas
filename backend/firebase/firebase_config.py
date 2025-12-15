@@ -33,7 +33,6 @@ def _get_firebase_credentials():
     # Find the first existing path
     for path in possible_paths:
         if path and os.path.exists(path):
-            print(f"Firebase key found at: {path}")
             return credentials.Certificate(path)
     
     return None
@@ -56,7 +55,7 @@ def _initialize_firebase():
     try:
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred)
-        print("Firebase initialized successfully")
+        print("[OK] Firebase initialized successfully")
         _initialized = True
     except Exception as e:
         print(f"Error initializing Firebase: {e}")

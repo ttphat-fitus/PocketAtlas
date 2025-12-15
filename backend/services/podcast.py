@@ -45,9 +45,9 @@ class PodcastService:
             if speech_key_path and os.path.exists(speech_key_path):
                 credentials = service_account.Credentials.from_service_account_file(speech_key_path)
                 self.tts_client = texttospeech.TextToSpeechClient(credentials=credentials)
-                print("[OK] TTS client initialized successfully from file")
+                print("[OK] TTS initialized successfully")
             else:
-                print("[WARN] Speech key not found. TTS features disabled.")
+                print("[WARN] TTS features disabled.")
                 self.tts_client = None
         except Exception as e:
             print(f"[WARN] Could not initialize TTS client: {e}")

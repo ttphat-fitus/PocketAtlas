@@ -23,11 +23,14 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import RouteMap from "../../../components/RouteMap";
 
-// Format date as dd/mm/yyyy
+// Format date as dd/mm/yyyy (avoid timezone shift for YYYY-MM-DD strings)
 const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
+  if (!dateString) return "";
+  const s = String(dateString);
+  const isoOnly = /^\d{4}-\d{2}-\d{2}$/;
+  const date = isoOnly.test(s) ? new Date(`${s}T00:00:00`) : new Date(s);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
   const year = date.getFullYear();
   return `${day}/${month}/${year}`;
 };
@@ -1067,6 +1070,17 @@ export default function TripPlanPage() {
     }
   }, [tripPlan]);
 
+  const computedTripTotalVnd = useMemo(() => {
+    if (!tripPlan?.days?.length) return 0;
+    return tripPlan.days.reduce((sum, day) => {
+      const dayTotal = (day.activities || []).reduce(
+        (acc, a) => acc + vndMidpoint(a.estimated_cost),
+        0
+      );
+      return sum + dayTotal;
+    }, 0);
+  }, [tripPlan]);
+
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (!isDirty) return;
@@ -1929,7 +1943,7 @@ export default function TripPlanPage() {
                 <div className="min-w-0">
                   <div className="text-[10px] text-blue-600 font-semibold">{language === "en" ? "Total Cost" : "Tổng chi phí"}</div>
                   <div className="font-bold text-gray-800 text-sm truncate">
-                    {formatPrice(tripPlan.total_estimated_cost)}
+                    {formatVndNumber(computedTripTotalVnd)} đ
                   </div>
                 </div>
               </div>
@@ -2067,7 +2081,7 @@ export default function TripPlanPage() {
                           <div className="text-sm font-semibold text-gray-700">
                             {language === "en" ? `Day ${weather.day}` : `Ngày ${weather.day}`}
                           </div>
-                          <div className="text-xs text-gray-500">{weather.date}</div>
+                          <div className="text-xs text-gray-500">{formatDate(weather.date)}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-2xl font-bold text-blue-600">
