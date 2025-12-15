@@ -657,6 +657,14 @@ export default function TripDetailPage() {
     return (tripPlan?.days || []).reduce((acc, d) => acc + dayTotalDistanceKm(d), 0);
   }, [tripPlan]);
 
+  const computedTripTotalVnd = useMemo(() => {
+    if (!tripPlan?.days) return 0;
+    return (tripPlan.days || []).reduce((tripAcc, day) => {
+      const daySum = (day.activities || []).reduce((sum, activity) => sum + vndMidpoint(activity.estimated_cost), 0);
+      return tripAcc + daySum;
+    }, 0);
+  }, [tripPlan]);
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-green-50 flex items-center justify-center">
@@ -857,7 +865,7 @@ export default function TripDetailPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     <div className="flex-1">
-                      <div className="text-xs text-gray-500">{language === "en" ? "Start Date" : "Ngày bắt đầu"}</div>
+                      <div className="font-semibold">{language === "en" ? "Start Date" : "Ngày bắt đầu"}</div>
                       <div className="font-semibold text-gray-800">{formatDate(tripData.start_date)}</div>
                     </div>
                   </div>
@@ -869,11 +877,12 @@ export default function TripDetailPage() {
                     <svg className="w-5 h-5 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    <span className="text-sm text-indigo-600 font-semibold">{language === "en" ? "Total Cost" : "Tổng chi phí"}</span>
+                    <div className="flex-1">
+                      <div className="text-sm text-indigo-600 font-semibold">{language === "en" ? "Total Cost" : "Tổng chi phí"}</div>
+                      <div className="font-bold text-indigo-700">{formatVndNumber(computedTripTotalVnd)} đ </div>
+                    </div>
                   </div>
-                  <div className="font-bold text-indigo-700">
-                    {tripPlan?.total_estimated_cost?.replace(/VND/g, '₫').replace(/đ/g, '₫') || '0 ₫'}
-                  </div>
+                  
 
                   {/* Per-day distances are shown inside each day card; overall plan distance removed */}
                 </div>
