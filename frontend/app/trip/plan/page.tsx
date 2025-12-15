@@ -661,19 +661,11 @@ function SortableActivity({
                 </button>
 
                 {/* Price Badge */}
-                {isEditing ? (
-                  <input
-                    type="text"
-                    className="input input-bordered input-sm w-44"
-                    placeholder={t("plan.estimatedCost")}
-                    value={activity.estimated_cost}
-                    onChange={(e) => onEdit("estimated_cost", e.target.value)}
-                  />
-                ) : (
-                  <div className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full whitespace-nowrap">
-                    {formatPrice(activity.estimated_cost)}
-                  </div>
-                )}
+              
+                <div className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full whitespace-nowrap">
+                  {formatPrice(activity.estimated_cost)}
+                </div>
+                
 
                 {/* Tips Toggle Button (hidden by default; user must click to reveal) */}
                 {activity.tips && !isEditing && (
