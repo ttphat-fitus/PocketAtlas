@@ -22,6 +22,54 @@ from services.podcast import podcast_service
 router = APIRouter()
 
 
+def _normalize_compact_text(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip().lower())
+
+
+def _is_travel_placeholder_activity(activity: dict) -> bool:
+    """Detect AI-generated travel-only rows like 'Di chuyển'."""
+    try:
+        place = _normalize_compact_text(str(activity.get("place", "")))
+        if not place:
+            return False
+
+        # Vietnamese placeholders
+        if place == "di chuyển" or place.startswith("di chuyển "):
+            return True
+        if place == "di chuyen" or place.startswith("di chuyen "):
+            return True
+
+        # Common English placeholders
+        if place in {"travel", "transit", "commute", "move"}:
+            return True
+    except Exception:
+        return False
+
+    return False
+
+
+def sanitize_trip_plan(trip_plan: dict) -> dict:
+    """Remove travel-only placeholder activities from a plan."""
+    if not isinstance(trip_plan, dict):
+        return trip_plan
+    days = trip_plan.get("days")
+    if not isinstance(days, list):
+        return trip_plan
+
+    for day in days:
+        if not isinstance(day, dict):
+            continue
+        activities = day.get("activities")
+        if not isinstance(activities, list) or not activities:
+            continue
+        day["activities"] = [
+            a for a in activities
+            if isinstance(a, dict) and not _is_travel_placeholder_activity(a)
+        ]
+
+    return trip_plan
+
+
 @router.post("/api/plan-trip")
 async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)):
     """Generate personalized travel itinerary"""
@@ -51,6 +99,12 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         
         json_str = match.group(1) or match.group(2)
         trip_plan = json.loads(json_str)
+
+        # Remove AI travel-only rows like 'Di chuyển' before any enrichment/scheduling.
+        try:
+            trip_plan = sanitize_trip_plan(trip_plan)
+        except Exception as e:
+            print(f"[WARN] Could not sanitize trip plan: {e}")
 
         # Cap activities/day before any scheduling adjustments.
         try:
@@ -148,6 +202,8 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
                 "preferences": trip_request.preferences,
                 "activity_level": trip_request.activity_level,
                 "travel_group": trip_request.travel_group,
+                "group_size": trip_request.group_size,
+                "travel_mode": trip_request.travel_mode,
                 "categories": trip_request.categories,
                 "active_time_start": trip_request.active_time_start,
                 "active_time_end": trip_request.active_time_end,
@@ -234,6 +290,13 @@ async def get_trip(trip_id: str, user = Depends(get_current_user)):
             return JSONResponse(status_code=404, content={"error": "Trip not found"})
         
         trip_data = trip_doc.to_dict()
+
+        # Sanitize plan on read to avoid showing legacy travel-only rows.
+        try:
+            if isinstance(trip_data.get("trip_plan"), dict):
+                trip_data["trip_plan"] = sanitize_trip_plan(trip_data["trip_plan"])
+        except Exception as e:
+            print(f"[WARN] Could not sanitize trip plan on read: {e}")
         
         if trip_data.get("user_id") != user['uid']:
             return JSONResponse(status_code=403, content={"error": "Not authorized"})
@@ -311,6 +374,12 @@ async def update_trip_plan(trip_id: str, payload: UpdateTripPlanRequest, user = 
         trip_name = None
         if isinstance(trip_plan, dict):
             trip_name = trip_plan.get("trip_name")
+
+            # Remove travel-only rows like 'Di chuyển' on save.
+            try:
+                trip_plan = sanitize_trip_plan(trip_plan)
+            except Exception as e:
+                print(f"[WARN] Could not sanitize trip plan on save: {e}")
 
             # Enforce backend constraints on saved plans.
             try:

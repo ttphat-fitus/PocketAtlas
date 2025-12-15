@@ -91,13 +91,6 @@ def apply_time_buffers(trip_plan: dict[str, Any], *,
                        active_time_start: Optional[int],
                        active_time_end: Optional[int],
                        travel_mode: Optional[str]) -> dict[str, Any]:
-    """Ensure consecutive activities include a buffer time between them.
-
-    This adjusts times deterministically (preserving each activity duration when parseable),
-    shifting later activities forward when needed.
-
-    If activity time strings are unparseable, they are left as-is.
-    """
 
     buffer_min = buffer_minutes_for_mode(travel_mode)
 
@@ -120,6 +113,8 @@ def apply_time_buffers(trip_plan: dict[str, Any], *,
 
         current_end = None
 
+        force_sequential = start_floor is not None
+
         for idx, activity in enumerate(activities):
             if not isinstance(activity, dict):
                 continue
@@ -133,7 +128,9 @@ def apply_time_buffers(trip_plan: dict[str, Any], *,
             if idx == 0:
                 start = parsed.start_min
                 if start_floor is not None:
-                    start = max(start, start_floor)
+                    # Force the day to begin at the configured start hour.
+                    # This avoids AI plans always starting at 09:00.
+                    start = start_floor
                 end = start + duration
                 activity["time"] = format_time_range(start, end)
                 current_end = end
@@ -144,7 +141,9 @@ def apply_time_buffers(trip_plan: dict[str, Any], *,
 
             # Enforce buffer between previous end and next start
             desired_start = current_end + buffer_min
-            start = max(parsed.start_min, desired_start)
+            # If active_time_start is set, schedule sequentially from the day start,
+            # ignoring the AI-provided absolute times to optimize earlier starts.
+            start = desired_start if force_sequential else max(parsed.start_min, desired_start)
             end = start + duration
 
             if end_cap is not None:

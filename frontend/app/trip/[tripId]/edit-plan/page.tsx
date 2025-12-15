@@ -54,6 +54,8 @@ export default function EditTripPlanPage() {
           duration: data?.duration,
           budget: data?.budget,
           travel_mode: data?.travel_mode,
+          travel_group: data?.travel_group,
+          group_size: data?.group_size,
           activity_level: data?.activity_level,
           start_date: data?.start_date,
           preferences: data?.preferences,

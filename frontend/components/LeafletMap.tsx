@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { useEffect, useMemo, useRef } from "react";
 
 interface Location {
   lat: number;
@@ -12,53 +10,56 @@ interface Location {
   seq?: number;
 }
 
-interface LeafletMapProps {
+export interface LeafletMapProps {
   locations: Location[];
   showRoute?: boolean;
+  showTraffic?: boolean;
   height?: string;
   activeSegmentStartIndex?: number | null;
   onLocationClick?: (index: number) => void;
   travelMode?: string;
 }
 
-const OSRM_ROUTE_CACHE = new Map<string, L.LatLngExpression[]>();
+let googleMapsScriptPromise: Promise<void> | null = null;
 
-function osrmProfileForTravelMode(travelMode?: string): "driving" | "foot" | "bike" {
-  const m = (travelMode || "").toLowerCase();
+function loadGoogleMapsScript(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  const anyWin = window as any;
+  if (anyWin.google?.maps) return Promise.resolve();
 
-  // Vietnamese
-  if (m.includes("đi bộ") || m.includes("di bo") || m.includes("walk")) return "foot";
-  if (m.includes("xe đạp") || m.includes("xe dap") || m.includes("bike") || m.includes("bicycle")) return "bike";
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    return Promise.reject(new Error("Missing NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"));
+  }
 
-  // Default: road driving (includes car/motorbike/taxi)
-  return "driving";
+  if (googleMapsScriptPromise) return googleMapsScriptPromise;
+  googleMapsScriptPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>("script[data-google-maps-js='true']");
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Failed to load Google Maps script")));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.dataset.googleMapsJs = "true";
+    script.async = true;
+    script.defer = true;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly`;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Google Maps script"));
+    document.head.appendChild(script);
+  });
+  return googleMapsScriptPromise;
 }
 
-async function fetchOsrmRoute(
-  profile: "driving" | "foot" | "bike",
-  coords: Array<{ lat: number; lng: number }>,
-  signal: AbortSignal
-): Promise<L.LatLngExpression[] | null> {
-  if (coords.length < 2) return null;
-
-  const coordStr = coords.map((c) => `${c.lng},${c.lat}`).join(";");
-  const cacheKey = `${profile}:${coordStr}`;
-  const cached = OSRM_ROUTE_CACHE.get(cacheKey);
-  if (cached) return cached;
-
-  const url = `https://router.project-osrm.org/route/v1/${profile}/${coordStr}?overview=full&geometries=geojson&steps=false`;
-  const res = await fetch(url, { signal });
-  if (!res.ok) return null;
-
-  const data = await res.json();
-  const coordinates = data?.routes?.[0]?.geometry?.coordinates as
-    | Array<[number, number]>
-    | undefined;
-  if (!Array.isArray(coordinates) || coordinates.length < 2) return null;
-
-  const routePoints: L.LatLngExpression[] = coordinates.map(([lng, lat]) => [lat, lng]);
-  OSRM_ROUTE_CACHE.set(cacheKey, routePoints);
-  return routePoints;
+function googleTravelModeFor(travelMode?: string): google.maps.TravelMode {
+  const m = (travelMode || "").toLowerCase();
+  if (m.includes("đi bộ") || m.includes("di bo") || m.includes("walk")) return google.maps.TravelMode.WALKING;
+  if (m.includes("xe đạp") || m.includes("xe dap") || m.includes("bike") || m.includes("bicycle"))
+    return google.maps.TravelMode.BICYCLING;
+  if (m.includes("transit") || m.includes("bus") || m.includes("train")) return google.maps.TravelMode.TRANSIT;
+  return google.maps.TravelMode.DRIVING;
 }
 
 // Get gradient color based on position
@@ -77,230 +78,283 @@ const getMarkerColor = (index: number, total: number): string => {
   return colors[colorIndex];
 };
 
-// Create custom numbered marker icon
-const createNumberedIcon = (number: number, color: string): L.DivIcon => {
-  return L.divIcon({
-    className: "custom-marker",
-    html: `
-      <div style="
-        width: 32px;
-        height: 32px;
-        background-color: ${color};
-        border: 3px solid white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        font-size: 14px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      ">${number}</div>
-    `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16],
-  });
-};
+function markerSymbol(color: string): google.maps.Symbol {
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: color,
+    fillOpacity: 1,
+    strokeColor: "#ffffff",
+    strokeOpacity: 1,
+    strokeWeight: 3,
+    scale: 14,
+  };
+}
+
+function dashedLineIcon(): google.maps.IconSequence {
+  return {
+    icon: {
+      path: "M 0,-1 0,1",
+      strokeOpacity: 1,
+      scale: 4,
+    },
+    offset: "0",
+    repeat: "18px",
+  };
+}
 
 export default function LeafletMap({
   locations,
   showRoute = true,
+  showTraffic = true,
   height = "400px",
   activeSegmentStartIndex = null,
   onLocationClick,
   travelMode,
 }: LeafletMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const overlaysRef = useRef<{
+    markers: google.maps.Marker[];
+    polyline: google.maps.Polyline | null;
+    directionsRenderer: google.maps.DirectionsRenderer | null;
+    trafficLayer: google.maps.TrafficLayer | null;
+    infoWindow: google.maps.InfoWindow | null;
+  }>({
+    markers: [],
+    polyline: null,
+    directionsRenderer: null,
+    trafficLayer: null,
+    infoWindow: null,
+  });
 
-  // Filter valid locations
-  const validLocations = locations.filter(
-    (loc) => loc.lat && loc.lng && !isNaN(loc.lat) && !isNaN(loc.lng) && loc.lat !== 0 && loc.lng !== 0
+  const onLocationClickRef = useRef<LeafletMapProps["onLocationClick"]>(onLocationClick);
+  useEffect(() => {
+    onLocationClickRef.current = onLocationClick;
+  }, [onLocationClick]);
+
+  const validLocations = useMemo(
+    () =>
+      (locations || []).filter(
+        (loc) =>
+          loc &&
+          typeof loc.lat === "number" &&
+          typeof loc.lng === "number" &&
+          Number.isFinite(loc.lat) &&
+          Number.isFinite(loc.lng) &&
+          loc.lat !== 0 &&
+          loc.lng !== 0
+      ),
+    [locations]
+  );
+
+  const locationsSignature = useMemo(
+    () => validLocations.map((loc) => `${Number(loc.lat).toFixed(6)},${Number(loc.lng).toFixed(6)}`).join("|"),
+    [validLocations]
   );
 
   useEffect(() => {
     if (!mapRef.current || validLocations.length === 0) return;
+    let cancelled = false;
 
-    // Clean up previous map instance
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.remove();
-      mapInstanceRef.current = null;
-    }
-
-    // Calculate center
-    const avgLat = validLocations.reduce((sum, loc) => sum + loc.lat, 0) / validLocations.length;
-    const avgLng = validLocations.reduce((sum, loc) => sum + loc.lng, 0) / validLocations.length;
-
-    // Initialize map with better controls
-    const map = L.map(mapRef.current, {
-      center: [avgLat, avgLng],
-      zoom: 13,
-      scrollWheelZoom: true,
-      zoomControl: true,
-    });
-
-    mapInstanceRef.current = map;
-
-    // Add tile layer (OpenStreetMap) with better styling
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-      minZoom: 10,
-    }).addTo(map);
-
-    // Add scale control for better distance visualization
-    L.control.scale({
-      position: "bottomright",
-      metric: true,
-      imperial: false,
-      maxWidth: 150,
-    }).addTo(map);
-
-    const startIndex = typeof activeSegmentStartIndex === "number" ? activeSegmentStartIndex : null;
-    const canFocusSegment =
-      startIndex !== null && startIndex >= 0 && startIndex < validLocations.length - 1;
-
-    const displayLocations: Array<{ location: Location; originalIndex: number }> = canFocusSegment
-      ? [
-          { location: validLocations[startIndex], originalIndex: startIndex },
-          { location: validLocations[startIndex + 1], originalIndex: startIndex + 1 },
-        ]
-      : validLocations.map((l, idx) => ({ location: l, originalIndex: idx }));
-
-    // Add markers
-    const markers: L.Marker[] = [];
-    displayLocations.forEach(({ location, originalIndex }, index) => {
-      const displayNumber = typeof location.seq === "number" ? location.seq : originalIndex + 1;
-      const icon = createNumberedIcon(displayNumber, getMarkerColor(index, displayLocations.length));
-      
-      const marker = L.marker([location.lat, location.lng], { icon })
-        .addTo(map)
-        .bindPopup(`
-          <div style="padding: 4px; min-width: 150px;">
-            <div style="font-weight: bold; color: #1e40af; margin-bottom: 4px;">
-              ${displayNumber}. ${location.name}
-            </div>
-            ${location.time ? `<div style="font-size: 12px; color: #6b7280;">${location.time}</div>` : ""}
-          </div>
-        `);
-
-      marker.on("click", () => {
-        if (onLocationClick) onLocationClick(originalIndex);
-      });
-      
-      markers.push(marker);
-    });
-
-    // Draw route line with better visibility (optionally focus a single segment)
-    if (showRoute && validLocations.length > 1) {
-      const fallbackPoints: L.LatLngExpression[] = validLocations.map((loc) => [loc.lat, loc.lng]);
-
-      const controller = new AbortController();
-      const profile = osrmProfileForTravelMode(travelMode);
-
-      const isValidLatLngExpr = (p: L.LatLngExpression): boolean => {
-        if (Array.isArray(p)) {
-          const lat = Number(p[0]);
-          const lng = Number(p[1]);
-          return Number.isFinite(lat) && Number.isFinite(lng);
-        }
-        // Leaflet may accept LatLng objects, but we only generate arrays.
-        try {
-          const anyP: any = p as any;
-          return Number.isFinite(anyP?.lat) && Number.isFinite(anyP?.lng);
-        } catch {
-          return false;
-        }
-      };
-
-      const sanitizePath = (path: L.LatLngExpression[]) =>
-        (Array.isArray(path) ? path : []).filter(isValidLatLngExpr);
-
-      const drawPolyline = (pathRaw: L.LatLngExpression[]) => {
-        const path = sanitizePath(pathRaw);
-        if (path.length < 2) return;
-        // Shadow line for depth and visibility
-        L.polyline(path, {
-          color: "#000000",
-          weight: canFocusSegment ? 7 : 6,
-          opacity: canFocusSegment ? 0.18 : 0.15,
-        }).addTo(map);
-
-        // Main route line
-        L.polyline(path, {
-          color: "#3b82f6",
-          weight: canFocusSegment ? 5 : 4,
-          opacity: canFocusSegment ? 0.95 : 0.85,
-          lineJoin: "round",
-          lineCap: "round",
-        }).addTo(map);
-      };
-
-      (async () => {
-        try {
-          if (canFocusSegment) {
-            const segCoords = [
-              { lat: validLocations[startIndex].lat, lng: validLocations[startIndex].lng },
-              { lat: validLocations[startIndex + 1].lat, lng: validLocations[startIndex + 1].lng },
-            ];
-
-            const routed = await fetchOsrmRoute(profile, segCoords, controller.signal);
-            drawPolyline(
-              routed || [fallbackPoints[startIndex], fallbackPoints[startIndex + 1]]
-            );
-            return;
-          }
-
-          const routed = await fetchOsrmRoute(
-            profile,
-            validLocations.map((l) => ({ lat: l.lat, lng: l.lng })),
-            controller.signal
-          );
-          drawPolyline(routed || fallbackPoints);
-        } catch {
-          // Fallback: draw straight segments when OSRM is unavailable
-          if (canFocusSegment) {
-            drawPolyline([fallbackPoints[startIndex], fallbackPoints[startIndex + 1]]);
-            return;
-          }
-          drawPolyline(fallbackPoints);
-        }
-      })();
-
-      // Ensure OSRM request cancels on cleanup
-      map.on("unload", () => controller.abort());
-    }
-
-    // Fit bounds with better padding for optimal view
-    const boundsLocations = canFocusSegment ? displayLocations.map((d) => d.location) : validLocations;
-    if (boundsLocations.length > 1) {
-      const bounds = L.latLngBounds(boundsLocations.map((loc) => [loc.lat, loc.lng]));
-      
-      // Dynamic padding based on number of locations
-      const paddingSize = boundsLocations.length <= 3 ? 80 : boundsLocations.length <= 6 ? 60 : 50;
-      map.fitBounds(bounds, { 
-        padding: [paddingSize, paddingSize],
-        maxZoom: 15 // Prevent too much zoom for close locations
-      });
-    } else if (boundsLocations.length === 1) {
-      // Single location - center and set reasonable zoom
-      map.setView([boundsLocations[0].lat, boundsLocations[0].lng], 14);
-    }
-
-    // Cleanup
-    return () => {
-      if (mapInstanceRef.current) {
-        try {
-          mapInstanceRef.current.off();
-          mapInstanceRef.current.remove();
-        } catch (e) {
-          console.warn('Map cleanup warning:', e);
-        }
-        mapInstanceRef.current = null;
-      }
+    const cleanupOverlays = () => {
+      const overlays = overlaysRef.current;
+      overlays.markers.forEach((m) => m.setMap(null));
+      overlays.markers = [];
+      if (overlays.polyline) overlays.polyline.setMap(null);
+      overlays.polyline = null;
+      if (overlays.directionsRenderer) overlays.directionsRenderer.setMap(null);
+      overlays.directionsRenderer = null;
+      if (overlays.trafficLayer) overlays.trafficLayer.setMap(null);
+      overlays.trafficLayer = null;
+      overlays.infoWindow = null;
     };
-  }, [validLocations, showRoute, activeSegmentStartIndex, onLocationClick, travelMode]);
+
+    (async () => {
+      try {
+        await loadGoogleMapsScript();
+        if (cancelled) return;
+
+        const g = (window as any).google as typeof google;
+
+        cleanupOverlays();
+        if (mapRef.current) mapRef.current.innerHTML = "";
+
+        // Calculate center
+        const avgLat = validLocations.reduce((sum, loc) => sum + loc.lat, 0) / validLocations.length;
+        const avgLng = validLocations.reduce((sum, loc) => sum + loc.lng, 0) / validLocations.length;
+
+        const map = new g.maps.Map(mapRef.current as HTMLDivElement, {
+          center: { lat: avgLat, lng: avgLng },
+          zoom: 13,
+          clickableIcons: true,
+          fullscreenControl: false,
+          streetViewControl: false,
+          mapTypeControl: false,
+        });
+        mapInstanceRef.current = map;
+
+        if (showTraffic) {
+          const traffic = new g.maps.TrafficLayer();
+          traffic.setMap(map);
+          overlaysRef.current.trafficLayer = traffic;
+        }
+
+        const startIndex = typeof activeSegmentStartIndex === "number" ? activeSegmentStartIndex : null;
+        const canFocusSegment =
+          startIndex !== null && startIndex >= 0 && startIndex < validLocations.length - 1;
+
+        const displayLocations: Array<{ location: Location; originalIndex: number }> = canFocusSegment
+          ? [
+              { location: validLocations[startIndex], originalIndex: startIndex },
+              { location: validLocations[startIndex + 1], originalIndex: startIndex + 1 },
+            ]
+          : validLocations.map((l, idx) => ({ location: l, originalIndex: idx }));
+
+        const infoWindow = new g.maps.InfoWindow();
+        overlaysRef.current.infoWindow = infoWindow;
+
+        // Markers
+        displayLocations.forEach(({ location, originalIndex }, index) => {
+          const displayNumber = typeof location.seq === "number" ? location.seq : originalIndex + 1;
+          const color = getMarkerColor(index, displayLocations.length);
+
+          const marker = new g.maps.Marker({
+            position: { lat: location.lat, lng: location.lng },
+            map,
+            label: {
+              text: String(displayNumber),
+              color: "#ffffff",
+              fontWeight: "700",
+            },
+            icon: markerSymbol(color),
+            title: location.name,
+          });
+
+          marker.addListener("click", () => {
+            const handler = onLocationClickRef.current;
+            if (handler) handler(originalIndex);
+
+            const safeName = String(location.name || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const safeTime = String(location.time || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const content = `
+              <div style="padding: 6px; min-width: 160px;">
+                <div style="font-weight: 700; color: #1e40af; margin-bottom: 4px;">
+                  ${displayNumber}. ${safeName}
+                </div>
+                ${safeTime ? `<div style="font-size: 12px; color: #6b7280;">${safeTime}</div>` : ""}
+              </div>
+            `;
+            infoWindow.setContent(content);
+            infoWindow.open({ map, anchor: marker });
+          });
+
+          overlaysRef.current.markers.push(marker);
+        });
+
+        // Fit bounds
+        const boundsLocations = canFocusSegment ? displayLocations.map((d) => d.location) : validLocations;
+        if (boundsLocations.length > 1) {
+          const bounds = new g.maps.LatLngBounds();
+          boundsLocations.forEach((loc) => bounds.extend({ lat: loc.lat, lng: loc.lng }));
+          map.fitBounds(bounds, 80);
+        } else if (boundsLocations.length === 1) {
+          map.setCenter({ lat: boundsLocations[0].lat, lng: boundsLocations[0].lng });
+          map.setZoom(14);
+        }
+
+        // Route
+        if (showRoute && validLocations.length > 1) {
+          const coords = (canFocusSegment
+            ? [
+                { lat: validLocations[startIndex!].lat, lng: validLocations[startIndex!].lng },
+                { lat: validLocations[startIndex! + 1].lat, lng: validLocations[startIndex! + 1].lng },
+              ]
+            : validLocations.map((l) => ({ lat: l.lat, lng: l.lng }))) as Array<{ lat: number; lng: number }>;
+
+          const drawFallback = () => {
+            const line = new g.maps.Polyline({
+              path: coords,
+              geodesic: true,
+              strokeColor: "#3b82f6",
+              strokeOpacity: 0,
+              strokeWeight: 4,
+              icons: [dashedLineIcon()],
+            });
+            line.setMap(map);
+            overlaysRef.current.polyline = line;
+          };
+
+          // Avoid exceeding Google Directions waypoint limits (23 waypoints + origin + destination)
+          if (coords.length > 25) {
+            drawFallback();
+            return;
+          }
+
+          const service = new g.maps.DirectionsService();
+          const renderer = new g.maps.DirectionsRenderer({
+            suppressMarkers: true,
+            preserveViewport: true,
+            polylineOptions: {
+              strokeColor: "#3b82f6",
+              strokeOpacity: 0.85,
+              strokeWeight: 4,
+            },
+          });
+          renderer.setMap(map);
+          overlaysRef.current.directionsRenderer = renderer;
+
+          const origin = coords[0];
+          const destination = coords[coords.length - 1];
+          const waypoints = coords.slice(1, -1).map((c) => ({ location: c, stopover: true }));
+          const request: google.maps.DirectionsRequest = {
+            origin,
+            destination,
+            waypoints,
+            optimizeWaypoints: false,
+            travelMode: googleTravelModeFor(travelMode),
+          };
+
+          const result = await new Promise<{ res: google.maps.DirectionsResult | null; status: google.maps.DirectionsStatus }>(
+            (resolve) => {
+              service.route(request, (res, status) => resolve({ res, status }));
+            }
+          );
+
+          if (cancelled) return;
+
+          if (result.status === g.maps.DirectionsStatus.OK && result.res) {
+            renderer.setDirections(result.res);
+          } else {
+            // Directions may require billing/enabled API; always fall back to a visible line.
+            renderer.setMap(null);
+            overlaysRef.current.directionsRenderer = null;
+            drawFallback();
+          }
+        }
+      } catch (e) {
+        // If Google Maps cannot load (missing key / blocked), keep UI stable.
+        cleanupOverlays();
+        mapInstanceRef.current = null;
+        if (mapRef.current) mapRef.current.innerHTML = "";
+        console.warn("Google Maps init failed:", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      const overlays = overlaysRef.current;
+      overlays.markers.forEach((m) => m.setMap(null));
+      overlays.markers = [];
+      if (overlays.polyline) overlays.polyline.setMap(null);
+      overlays.polyline = null;
+      if (overlays.directionsRenderer) overlays.directionsRenderer.setMap(null);
+      overlays.directionsRenderer = null;
+      if (overlays.trafficLayer) overlays.trafficLayer.setMap(null);
+      overlays.trafficLayer = null;
+      overlays.infoWindow = null;
+      mapInstanceRef.current = null;
+    };
+  }, [locationsSignature, showRoute, showTraffic, activeSegmentStartIndex, travelMode]);
 
   // No valid locations
   if (validLocations.length === 0) {
@@ -315,6 +369,23 @@ export default function LeafletMap({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
           <p className="text-sm">Chưa có tọa độ địa điểm</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If key is missing, show a clear message instead of a blank map.
+  if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+    return (
+      <div
+        className="flex items-center justify-center bg-gray-100 rounded-lg border border-gray-200"
+        style={{ height }}
+      >
+        <div className="text-center text-gray-600 max-w-md px-4">
+          <div className="font-semibold mb-1">Chưa cấu hình Google Maps</div>
+          <div className="text-sm">
+            Thiếu biến môi trường <span className="font-mono">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</span>.
+          </div>
         </div>
       </div>
     );

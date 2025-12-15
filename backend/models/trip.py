@@ -1,11 +1,11 @@
 """Trip-related Pydantic models"""
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 
 class TripRequest(BaseModel):
     destination: str
-    duration: int
+    duration: int = Field(..., ge=1, le=3)
     budget: str
     start_date: str
     preferences: Optional[str] = ""

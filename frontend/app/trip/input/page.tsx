@@ -517,7 +517,7 @@ export default function TripInputPage() {
                 <div className="card-body overflow-visible">
                   <SectionTitle
                     title="Thời gian chuyến đi"
-                    tip="Chọn ngày bắt đầu và ngày kết thúc. Thời gian hợp lệ: 1–7 ngày."
+                    tip="Chọn ngày bắt đầu và ngày kết thúc. Thời gian hợp lệ: 1–3 ngày."
                     icon={
                       <svg
                         className="w-5 h-5 text-primary"

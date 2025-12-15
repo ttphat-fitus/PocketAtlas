@@ -101,6 +101,108 @@ const exportToAppleCalendar = (tripData: any, tripPlan: any) => {
   URL.revokeObjectURL(link.href);
 };
 
+function normalizeTravelModeKey(raw: unknown): "walk" | "motorbike" | "car" | "public" | "bicycle" | "other" {
+  const v = String(raw ?? "").trim().toLowerCase();
+  if (!v) return "other";
+  if (v === "đi bộ" || v === "walk" || v === "walking") return "walk";
+  if (v === "xe máy" || v === "motorbike" || v === "motorcycle") return "motorbike";
+  if (v === "ô tô" || v === "oto" || v === "car" || v === "driving") return "car";
+  if (v.includes("công cộng") || v.includes("public") || v.includes("transit") || v.includes("bus") || v.includes("metro")) return "public";
+  if (v === "xe đạp" || v === "bicycle" || v === "bike" || v === "cycling") return "bicycle";
+  return "other";
+}
+
+function formatTravelMode(raw: unknown, language: string): string {
+  const key = normalizeTravelModeKey(raw);
+  if (language === "en") {
+    if (key === "walk") return "Walk";
+    if (key === "motorbike") return "Motorbike";
+    if (key === "car") return "Car";
+    if (key === "public") return "Public transport";
+    if (key === "bicycle") return "Bicycle";
+    return String(raw ?? "-") || "-";
+  }
+  if (key === "walk") return "Đi bộ";
+  if (key === "motorbike") return "Xe máy";
+  if (key === "car") return "Ô tô";
+  if (key === "public") return "Phương tiện công cộng";
+  if (key === "bicycle") return "Xe đạp";
+  return String(raw ?? "-") || "-";
+}
+
+function TravelModeIcon({ mode, className }: { mode: unknown; className: string }) {
+  const key = normalizeTravelModeKey(mode);
+  if (key === "walk") {
+    return (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="10" cy="5" r="2" strokeWidth={2.2} />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M10 7l-2 4 3 2 1 8" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M8 11l-3 3" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 10l3 2 3-1" />
+      </svg>
+    );
+  }
+
+  if (key === "motorbike") {
+    return (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="7" cy="17" r="2" strokeWidth={2.2} />
+        <circle cx="17" cy="17" r="2" strokeWidth={2.2} />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 17h4l2-5h3" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M11 12h3l1 2" />
+      </svg>
+    );
+  }
+
+  if (key === "car") {
+    return (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 13l2-5h12l2 5v6h-2a2 2 0 01-4 0H10a2 2 0 01-4 0H4v-6z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M7 13h10" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M8 8l2-3h4l2 3" />
+      </svg>
+    );
+  }
+
+  if (key === "public") {
+    return (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M7 3h10a3 3 0 013 3v11a3 3 0 01-3 3H7a3 3 0 01-3-3V6a3 3 0 013-3z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M7 8h10" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 17h0.01M15 17h0.01" />
+      </svg>
+    );
+  }
+
+  if (key === "bicycle") {
+    return (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="7" cy="17" r="2" strokeWidth={2.2} />
+        <circle cx="17" cy="17" r="2" strokeWidth={2.2} />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 17l3-7h3l3 7" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M10 10h-2" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M14 10l-2 3" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+    </svg>
+  );
+}
+
+function inferGroupSize(data: any): number {
+  const raw = data?.group_size ?? data?.groupSize;
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 0) return Math.round(n);
+  const g = String(data?.travel_group ?? data?.travelGroup ?? "").trim().toLowerCase();
+  if (g === "solo") return 1;
+  if (g === "couple") return 2;
+  return 1;
+}
+
 interface PlaceDetails {
   name: string;
   address: string;
@@ -162,6 +264,8 @@ interface TripData {
   created_at: string;
   activity_level?: string;
   travel_mode?: string;
+  travel_group?: string;
+  group_size?: number;
   is_public?: boolean;
   category_tags?: string[];
 }
@@ -653,8 +757,8 @@ export default function TripDetailPage() {
             </div>
             <h1 className="text-3xl font-bold mb-4 mobile-heading">{tripPlan.trip_name}</h1>
             
-            {/* Trip Metadata - Time, Budget, Activity */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            {/* Trip Metadata - Time, Budget, Activity, Transport, Members */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
               <div className="flex items-center gap-3 p-3 bg-pink-50 rounded-lg">
                 <svg className="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -683,6 +787,29 @@ export default function TripDetailPage() {
                   <div className="text-xs text-gray-500">{language === "en" ? "Activity" : "Hoạt động"}</div>
                   <div className="font-semibold text-gray-800 capitalize">
                     {tripData.activity_level === "low" ? (language === "en" ? "Low" : "Thấp") : tripData.activity_level === "high" ? (language === "en" ? "High" : "Cao") : (language === "en" ? "Medium" : "Trung bình")}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-sky-50 rounded-lg">
+                <TravelModeIcon mode={tripData.travel_mode} className="w-5 h-5 text-sky-600" />
+                <div className="flex-1">
+                  <div className="text-xs text-gray-500">{language === "en" ? "Transport" : "Phương tiện"}</div>
+                  <div className="font-semibold text-gray-800">{formatTravelMode(tripData.travel_mode, language)}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
+                <svg className="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20v-1a4 4 0 00-4-4H7a4 4 0 00-4 4v1" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11a4 4 0 100-8 4 4 0 000 8z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 20v-1a4 4 0 00-3-3.87" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 3.13a4 4 0 010 7.75" />
+                </svg>
+                <div className="flex-1">
+                  <div className="text-xs text-gray-500">{language === "en" ? "Members" : "Thành viên"}</div>
+                  <div className="font-semibold text-gray-800">
+                    {inferGroupSize(tripData)} {language === "en" ? "people" : "người"}
                   </div>
                 </div>
               </div>

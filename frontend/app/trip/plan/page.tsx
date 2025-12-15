@@ -139,6 +139,110 @@ function formatKm(km: number): string {
   }
 }
 
+function normalizeTravelModeKey(raw: unknown): "walk" | "motorbike" | "car" | "public" | "bicycle" | "other" {
+  const v = String(raw ?? "").trim().toLowerCase();
+  if (!v) return "other";
+  if (v === "đi bộ" || v === "walk" || v === "walking") return "walk";
+  if (v === "xe máy" || v === "motorbike" || v === "motorcycle") return "motorbike";
+  if (v === "ô tô" || v === "oto" || v === "car" || v === "driving") return "car";
+  if (v.includes("công cộng") || v.includes("public") || v.includes("transit") || v.includes("bus") || v.includes("metro")) return "public";
+  if (v === "xe đạp" || v === "bicycle" || v === "bike" || v === "cycling") return "bicycle";
+  return "other";
+}
+
+function formatTravelMode(raw: unknown, language: string): string {
+  const key = normalizeTravelModeKey(raw);
+  if (language === "en") {
+    if (key === "walk") return "Walk";
+    if (key === "motorbike") return "Motorbike";
+    if (key === "car") return "Car";
+    if (key === "public") return "Public transport";
+    if (key === "bicycle") return "Bicycle";
+    return String(raw ?? "-") || "-";
+  }
+
+  if (key === "walk") return "Đi bộ";
+  if (key === "motorbike") return "Xe máy";
+  if (key === "car") return "Ô tô";
+  if (key === "public") return "Phương tiện công cộng";
+  if (key === "bicycle") return "Xe đạp";
+  return String(raw ?? "-") || "-";
+}
+
+function TravelModeIcon({ mode, className }: { mode: unknown; className: string }) {
+  const key = normalizeTravelModeKey(mode);
+  if (key === "walk") {
+    return (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="10" cy="5" r="2" strokeWidth={2.2} />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M10 7l-2 4 3 2 1 8" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M8 11l-3 3" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 10l3 2 3-1" />
+      </svg>
+    );
+  }
+
+  if (key === "motorbike") {
+    return (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="7" cy="17" r="2" strokeWidth={2} />
+        <circle cx="17" cy="17" r="2" strokeWidth={2} />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17h4l2-5h3" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 12h3l1 2" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 17h1" />
+      </svg>
+    );
+  }
+
+  if (key === "car") {
+    return (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 13l2-5h12l2 5v6h-2a2 2 0 01-4 0H10a2 2 0 01-4 0H4v-6z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M7 13h10" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M8 8l2-3h4l2 3" />
+      </svg>
+    );
+  }
+
+  if (key === "public") {
+    return (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M7 3h10a3 3 0 013 3v11a3 3 0 01-3 3H7a3 3 0 01-3-3V6a3 3 0 013-3z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M7 8h10" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 17h0.01M15 17h0.01" />
+      </svg>
+    );
+  }
+
+  if (key === "bicycle") {
+    return (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="7" cy="17" r="2" strokeWidth={2.2} />
+        <circle cx="17" cy="17" r="2" strokeWidth={2.2} />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 17l3-7h3l3 7" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M10 10h-2" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M14 10l-2 3" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+    </svg>
+  );
+}
+
+function inferGroupSize(params: any): number {
+  const raw = params?.group_size ?? params?.groupSize;
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 0) return Math.round(n);
+  const g = String(params?.travel_group ?? params?.travelGroup ?? "").trim().toLowerCase();
+  if (g === "solo") return 1;
+  if (g === "couple") return 2;
+  return 1;
+}
+
 interface PlaceDetails {
   name: string;
   address: string;
@@ -568,21 +672,22 @@ function SortableActivity({
                   </div>
                 )}
 
-                {/* Tips Toggle Button */}
-                {/* {activity.tips && !isEditing && (
+                {/* Tips Toggle Button (hidden by default; user must click to reveal) */}
+                {activity.tips && !isEditing && (
                   <button
                     onClick={() => setShowTips(!showTips)}
-                    className={`btn btn-xs gap-1 ${showTips ? 'btn-info' : 'btn-ghost btn-outline'}`}
+                    className={`btn btn-xs gap-1 ${showTips ? "btn-info" : "btn-ghost btn-outline"}`}
+                    title={t("plan.tips.toggle")}
                   >
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
-                    Tips
-                    <svg className={`w-3 h-3 transition-transform ${showTips ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span className="ml-1">{t("Tips") || "Tips"}</span>
+                    <svg className={`w-3 h-3 transition-transform ml-1 ${showTips ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
-                )} */}
+                )}
               </div>
 
               {(isEditing || activity._isNew || !activity.place) ? (
@@ -748,7 +853,7 @@ function SortableActivity({
                 <p className="text-gray-700 mb-3">{activity.description}</p>
               )} */}
 
-              {/* Collapsible Tips Section */}
+              {/* Tips Section */}
               {activity.tips && (showTips || isEditing) && (
                 <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg mb-3 animate-fadeIn">
                   <div className="flex items-start gap-2">
@@ -1454,6 +1559,20 @@ export default function TripPlanPage() {
           setTripPlan(nextPlan);
           localStorage.setItem("tripPlan", JSON.stringify(nextPlan));
           savedSnapshotRef.current = JSON.stringify(nextPlan);
+
+          const nextParams = {
+            destination: (refreshed as any)?.destination,
+            duration: (refreshed as any)?.duration,
+            budget: (refreshed as any)?.budget,
+            activity_level: (refreshed as any)?.activity_level,
+            travel_group: (refreshed as any)?.travel_group,
+            group_size: (refreshed as any)?.group_size,
+            travel_mode: (refreshed as any)?.travel_mode,
+            start_date: (refreshed as any)?.start_date,
+            preferences: (refreshed as any)?.preferences,
+          };
+          setTripParams(nextParams);
+          localStorage.setItem("tripParams", JSON.stringify(nextParams));
         } else {
           savedSnapshotRef.current = JSON.stringify(tripPlan);
         }
@@ -1800,10 +1919,10 @@ export default function TripPlanPage() {
             {/* Title */}
             <h2 className="text-3xl font-bold mb-6 mobile-heading">{tripPlan.trip_name}</h2>
             
-            {/* 6 Badges in One Row - Fill Width */}
-            <div className="flex flex-wrap gap-2 mb-6">
+            {/* 8 Badges in One Row - Fill Width */}
+            <div className="flex flex-wrap gap-2 mb-8">
               {/* Total Cost Card - Larger */}
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg border-2 border-blue-300 shadow-sm flex-1 min-w-0">
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg border-2 border-blue-300 shadow-sm flex-2 min-w-0">
                 <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
@@ -1847,6 +1966,31 @@ export default function TripPlanPage() {
                     <div className="min-w-0">
                       <div className="text-[10px] text-purple-600 font-medium">{language === "en" ? "Activity" : "Hoạt động"}</div>
                       <div className="font-bold text-gray-800 text-xs truncate">{tripParams.activity_level === "low" ? (language === "en" ? "Low" : "Thấp") : tripParams.activity_level === "medium" ? (language === "en" ? "Medium" : "Trung bình") : (language === "en" ? "High" : "Cao")}</div>
+                    </div>
+                  </div>
+
+                  {/* Travel Mode Badge */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-2.5 bg-sky-50 rounded-lg border border-sky-200 flex-1 min-w-0">
+                    <TravelModeIcon mode={tripParams.travel_mode} className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-sky-600 font-medium">{language === "en" ? "Transport" : "Phương tiện"}</div>
+                      <div className="font-bold text-gray-800 text-xs truncate">{formatTravelMode(tripParams.travel_mode, language)}</div>
+                    </div>
+                  </div>
+
+                  {/* Members Badge */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-2.5 bg-amber-50 rounded-lg border border-amber-200 flex-1 min-w-0">
+                    <svg className="w-4 h-4 text-amber-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20v-1a4 4 0 00-4-4H7a4 4 0 00-4 4v1" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11a4 4 0 100-8 4 4 0 000 8z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 20v-1a4 4 0 00-3-3.87" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 3.13a4 4 0 010 7.75" />
+                    </svg>
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-amber-700 font-medium">{language === "en" ? "Members" : "Thành viên"}</div>
+                      <div className="font-bold text-gray-800 text-xs truncate">
+                        {inferGroupSize(tripParams)} {language === "en" ? "people" : "người"}
+                      </div>
                     </div>
                   </div>
                 </>

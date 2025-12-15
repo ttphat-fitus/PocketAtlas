@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { LeafletMapProps } from "./LeafletMap";
 
 interface Location {
   lat: number;
@@ -13,6 +14,7 @@ interface Location {
 interface RouteMapProps {
   locations: Location[];
   showRoute?: boolean;
+  showTraffic?: boolean;
   height?: string;
   activeSegmentStartIndex?: number | null;
   onLocationClick?: (index: number) => void;
@@ -20,7 +22,7 @@ interface RouteMapProps {
 }
 
 // Dynamically import LeafletMap (client-side only, no SSR)
-const LeafletMap = dynamic(() => import("./LeafletMap"), { 
+const LeafletMap = dynamic<LeafletMapProps>(() => import("./LeafletMap"), { 
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center bg-gray-100 rounded-lg animate-pulse h-full min-h-[400px]">
@@ -32,6 +34,7 @@ const LeafletMap = dynamic(() => import("./LeafletMap"), {
 export default function RouteMap({
   locations,
   showRoute = true,
+  showTraffic = true,
   height = "400px",
   activeSegmentStartIndex = null,
   onLocationClick,
@@ -41,6 +44,7 @@ export default function RouteMap({
     <LeafletMap 
       locations={locations} 
       showRoute={showRoute} 
+      showTraffic={showTraffic}
       height={height} 
       activeSegmentStartIndex={activeSegmentStartIndex}
       onLocationClick={onLocationClick}
