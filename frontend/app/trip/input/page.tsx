@@ -845,7 +845,7 @@ export default function TripInputPage() {
                                 ? `${formatDisplayDate(
                                     journeyStart
                                   )} – ${formatDisplayDate(journeyEnd)}`
-                                : "Chọn tối đa 3 ngày"}
+                                : "Chọn tối đa 7 ngày"}
                             </div>
                             <button
                               type="button"
