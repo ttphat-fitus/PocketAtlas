@@ -145,7 +145,7 @@ export default function TripInputPage() {
   const router = useRouter();
   const { user, loading: authLoading, signInAnon, getIdToken } = useAuth();
 
-  const MAX_TRIP_DAYS = 3;
+  const MAX_TRIP_DAYS = 7;
   const MAX_TRIP_END_OFFSET = MAX_TRIP_DAYS - 1; // inclusive range
 
   const [destination, setDestination] = useState("");
@@ -516,7 +516,7 @@ export default function TripInputPage() {
                 <div className="card-body overflow-visible">
                   <SectionTitle
                     title="Thời gian chuyến đi"
-                    tip="Chọn ngày bắt đầu và ngày kết thúc. Thời gian hợp lệ: 1–3 ngày."
+                    tip="Chọn ngày bắt đầu và ngày kết thúc. Thời gian hợp lệ: 1–7 ngày."
                     icon={
                       <svg
                         className="w-5 h-5 text-primary"
@@ -868,7 +868,7 @@ export default function TripInputPage() {
                   </div>
 
                   <div className="mt-2 text-xs text-slate-500">
-                    Thời gian tối đa: 3 ngày.
+                    Thời gian tối đa: 7 ngày.
                   </div>
                 </div>
               </div>
