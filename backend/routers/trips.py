@@ -116,7 +116,7 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
         except Exception as e:
             print(f"[WARN] Could not apply time buffers: {e}")
         
-        # Get destination weather forecast with score and warning level
+        # Get destination weather forecast (Google Maps Platform Weather API supports up to 10 days)
         destination_weather = []
         weather_info = {}
         forecasts = []
@@ -125,42 +125,53 @@ async def plan_trip(trip_request: TripRequest, user = Depends(get_optional_user)
             start_date = datetime.strptime(trip_request.start_date, "%Y-%m-%d").date()
             today = datetime.now().date()
             days_until_trip = (start_date - today).days
-            
-            if 0 <= days_until_trip <= 3:  # Only fetch weather for trips within 3 days
-                location_coords = await async_geocode(trip_request.destination)
-                
-                if location_coords.get("lat"):
-                    weather_data = await get_weather_forecast_async(
-                        location_coords["lat"], 
-                        location_coords["lng"], 
-                        trip_request.duration  # Get weather for full trip duration
-                    )
-                    forecasts = weather_data.get("forecasts", [])
-                    weather_info = {
-                        "forecasts": forecasts
-                    }
-                    print(f"[OK] Weather API returned {len(forecasts)} days of forecast")
+
+            location_coords = await async_geocode(trip_request.destination)
+            if location_coords.get("lat"):
+                # Request the maximum supported days (10). We'll later map by date.
+                weather_data = await get_weather_forecast_async(
+                    location_coords["lat"],
+                    location_coords["lng"],
+                    10,
+                )
+                forecasts = weather_data.get("forecasts", [])
+                weather_info = {"forecasts": forecasts}
+                print(f"[OK] Weather API returned {len(forecasts)} days of forecast")
             else:
-                print(f"[WARN] Trip starts in {days_until_trip} days - beyond 3-day weather forecast range")
-            
+                print("[WARN] Missing destination coordinates; skipping weather")
+
             if forecasts:
-                for i in range(min(trip_request.duration, len(forecasts))):
+                forecast_by_date = {}
+                for fc in forecasts:
+                    if isinstance(fc, dict) and fc.get("date"):
+                        forecast_by_date[str(fc.get("date"))] = fc
+
+                for i in range(int(trip_request.duration or 0)):
                     trip_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
-                    if i < len(forecasts):
-                        fc = forecasts[i]
-                        destination_weather.append({
-                            "day": i + 1,
-                            "date": fc.get("date", trip_date),
-                            "temp_max": fc.get("temp_max", 0),
-                            "temp_min": fc.get("temp_min", 0),
-                            "condition": fc.get("condition", ""),
-                            "rain_chance": fc.get("rain_chance", 0),
-                            "humidity": fc.get("humidity", 0),
-                            "is_rainy": fc.get("is_rainy", False),
-                            "is_sunny": fc.get("is_sunny", False)
-                        })
-                
-                print(f"[OK] Weather forecast added for {len(destination_weather)} days")
+                    fc = forecast_by_date.get(trip_date)
+                    if not fc:
+                        continue
+                    destination_weather.append({
+                        "day": i + 1,
+                        "date": fc.get("date", trip_date),
+                        "temp_max": fc.get("temp_max", 0),
+                        "temp_min": fc.get("temp_min", 0),
+                        "condition": fc.get("condition", ""),
+                        "rain_chance": fc.get("rain_chance", 0),
+                        "humidity": fc.get("humidity", 0),
+                        "is_rainy": fc.get("is_rainy", False),
+                        "is_sunny": fc.get("is_sunny", False),
+                    })
+
+                if destination_weather:
+                    print(f"[OK] Weather forecast added for {len(destination_weather)} days")
+                else:
+                    if days_until_trip > 10:
+                        print(
+                            f"[WARN] Trip starts in {days_until_trip} days; forecast only available for up to 10 days"
+                        )
+                    else:
+                        print("[WARN] No matching forecast dates for trip window")
         except Exception as e:
             print(f"[ERROR] Could not fetch destination weather: {e}")
         

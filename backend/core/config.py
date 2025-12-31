@@ -34,6 +34,7 @@ def load_key(env_var: str, json_file: str = None, json_key: list = None):
 GOOGLE_API_KEY = load_key("GOOGLE_API_KEY", "chatbot_key.json", ["GOOGLE_API_KEY"])
 GOOGLE_MAPS_API_KEY = load_key("GOOGLE_MAPS_API_KEY", "maps_key.json", ["GOOGLE_MAPS_API_KEY"])
 WEATHER_API_KEY = load_key("WEATHER_API_KEY", "weather_key.json", ["WeatherAPIKey"])
+GOOGLE_WEATHER_API_KEY = os.getenv("GOOGLE_WEATHER_API_KEY") or GOOGLE_MAPS_API_KEY
 UNSPLASH_ACCESS_KEY = load_key("UNSPLASH_ACCESS_KEY", "unsplash_key.json", ["credentials", "accessKey"])
 
 # Configure Gemini AI
@@ -56,7 +57,7 @@ SAFETY_SETTINGS = [
 
 # Initialize Gemini model
 model = genai.GenerativeModel(
-    'gemini-2.5-flash',
+    'gemini-2.5-pro',
     generation_config=GENERATION_CONFIG,
     safety_settings=SAFETY_SETTINGS
 )

@@ -380,11 +380,18 @@ export default function MyTripsPage() {
                         const colorScheme = tripInfo ? TRIP_COLORS[tripInfo.tripIndex % TRIP_COLORS.length] : null;
                         const isWeekStart = dayIdx === 0;
                         const isWeekEnd = dayIdx === 6;
+                        const tripTitle = tripInfo
+                          ? (trips[tripInfo.tripIndex]?.trip_name?.trim() || trips[tripInfo.tripIndex]?.destination || '')
+                          : '';
                         
                         return (
                           <div
                             key={`${weekIdx}-${dayIdx}`}
+                            title={tripInfo ? tripTitle : undefined}
+                            aria-label={tripInfo ? tripTitle : undefined}
+                            data-tip={tripInfo ? tripTitle : undefined}
                             className={`h-8 flex items-center justify-center text-xs font-medium transition-colors
+                              ${tripInfo ? 'tooltip tooltip-top cursor-help' : ''}
                               ${!day ? '' : tripInfo ? `${colorScheme!.bg} text-gray-800` : 'text-gray-700'}
                               ${tripInfo && (tripInfo.isFirst || isWeekStart) ? 'rounded-l-lg' : ''}
                               ${tripInfo && (tripInfo.isLast || isWeekEnd) ? 'rounded-r-lg' : ''}
