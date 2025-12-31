@@ -15,7 +15,7 @@
 
 ---
 
-## 🎯 The Elevator Pitch
+## The Elevator Pitch
 
 Imagine having a **professional travel consultant in your pocket** that works 24/7, knows every destination like a local, and creates personalized itineraries tailored to your exact preferences and budget—all in under a minute.
 
@@ -25,45 +25,45 @@ Imagine having a **professional travel consultant in your pocket** that works 24
 
 ---
 
-## ✨ Why You'll Love It
+## Why You'll Love It
 
-### 🤖 **AI That Actually Gets You**
+### **AI That Actually Gets You**
 Forget generic itineraries. Our AI-powered engine creates trips that match YOUR style:
-- 💰 **Budget-Conscious or Luxury Lover?** Choose from low, medium, or high budget tiers with real cost estimates
-- 🏃 **Adventure Junkie or Relaxation Seeker?** Set your activity intensity from chill to thrilling
-- 👥 **Solo, Couple, Family, or Squad?** We optimize for your travel group
+- **Budget-Conscious or Luxury Lover?** Choose from low, medium, or high budget tiers with real cost estimates
+- **Adventure Junkie or Relaxation Seeker?** Set your activity intensity from chill to thrilling
+- **Solo, Couple, Family, or Squad?** We optimize for your travel group
 
-### 🗺️ **Interactive Maps That Make Sense**
+### **Interactive Maps That Make Sense**
 - See your entire trip visualized on beautiful interactive maps
 - Get turn-by-turn directions between every activity
 - Explore each location with photos, ratings, and real reviews
 - One tap to open navigation in Google Maps
 
-### 🌦️ **Weather-Smart Planning**
+### **Weather-Smart Planning**
 - 3-day weather forecasts integrated into your itinerary
 - Automatic packing suggestions based on climate
 - Activity recommendations that adapt to weather conditions
 - Never get caught in the rain unprepared again
 
-### 🎮 **Gamification That Rewards Exploration**
+### **Gamification That Rewards Exploration**
 - Earn badges and achievements as you plan and travel
 - Collect points for creating trips, sharing experiences, and engaging with the community
 - Unlock rewards and climb the traveler ranks
 - Track your travel stats and see your journey evolve
 
-### 🌐 **Community-Powered Inspiration**
+### **Community-Powered Inspiration**
 - Browse thousands of itineraries shared by real travelers
 - Discover hidden gems through community ratings and reviews
 - Share your own adventures to inspire others
 - Search trips by destination, budget, duration, or vibe
 
-### 🎨 **Personalization Like Never Before**
+### **Personalization Like Never Before**
 - Drag-and-drop to reorder activities in seconds
 - Edit times, costs, and descriptions on the fly
 - Export your plan to Google Calendar or Apple Calendar
 - Generate audio podcasts of your itinerary (hands-free trip review!)
 
-### 🔒 **Your Data, Your Rules**
+### **Your Data, Your Rules**
 - Sign in with Google or email (or browse as a guest)
 - Cloud-synced trips accessible from any device
 - Choose what to keep private and what to share publicly
@@ -71,7 +71,7 @@ Forget generic itineraries. Our AI-powered engine creates trips that match YOUR 
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -159,12 +159,12 @@ Once you see `✓ Ready` in your terminal:
 1. Sign up or sign in with Google
 2. Click "Plan a Trip"
 3. Fill in your destination, dates, budget, and preferences
-4. Watch the AI magic happen ✨
+4. Watch the AI magic happen
 5. Customize, save, and share your perfect itinerary!
 
 ---
 
-## 🛠️ Development Mode
+## Development Mode
 
 Want to develop locally without Docker?
 
@@ -195,7 +195,7 @@ Access at http://localhost:3000
 
 ---
 
-## 📦 Tech Stack
+## Tech Stack
 
 <div align="center">
 
@@ -213,7 +213,7 @@ Access at http://localhost:3000
 
 ---
 
-<!-- ## 🎨 Screenshots
+<!-- ## Screenshots
 
 > *(Add your screenshots here)*
 
@@ -226,7 +226,7 @@ Access at http://localhost:3000
 
 --- -->
 
-## 📝 Project Structure
+## Project Structure
 
 ```
 pocket-atlas/
@@ -245,13 +245,13 @@ pocket-atlas/
 ```
 
 ---
-## 📄 License
+<!-- ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
----
+--- -->
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 <details>
 <summary><b>Docker build fails</b></summary>
