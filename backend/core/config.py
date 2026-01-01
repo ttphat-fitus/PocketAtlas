@@ -1,41 +1,16 @@
 """Configuration management for API keys and settings"""
-import json
 import os
-from pathlib import Path
 from dotenv import load_dotenv
 import google.generativeai as genai
 
 load_dotenv('.env.local')
 load_dotenv()
 
-# Load API Keys from environment or JSON files
-KEY_DIR = Path(__file__).parent.parent / "key"
-
-# Try to load from environment first, then from JSON files (for local development)
-def load_key(env_var: str, json_file: str = None, json_key: list = None):
-    """Load API key from environment variable or JSON file"""
-    value = os.getenv(env_var)
-    if value:
-        return value
-    
-    if json_file and json_key:
-        try:
-            with open(KEY_DIR / json_file) as f:
-                data = json.load(f)
-                result = data
-                for key in json_key:
-                    result = result[key]
-                return result
-        except (FileNotFoundError, KeyError):
-            print(f"Warning: Could not load {env_var} from {json_file}")
-            return None
-    return None
-
-GOOGLE_API_KEY = load_key("GOOGLE_API_KEY", "chatbot_key.json", ["GOOGLE_API_KEY"])
-GOOGLE_MAPS_API_KEY = load_key("GOOGLE_MAPS_API_KEY", "maps_key.json", ["GOOGLE_MAPS_API_KEY"])
-WEATHER_API_KEY = load_key("WEATHER_API_KEY", "weather_key.json", ["WeatherAPIKey"])
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 GOOGLE_WEATHER_API_KEY = os.getenv("GOOGLE_WEATHER_API_KEY") or GOOGLE_MAPS_API_KEY
-UNSPLASH_ACCESS_KEY = load_key("UNSPLASH_ACCESS_KEY", "unsplash_key.json", ["credentials", "accessKey"])
+UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
 # Configure Gemini AI
 if GOOGLE_API_KEY:

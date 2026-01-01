@@ -14,7 +14,6 @@ _firebase_db = None
 _initialized = False
 
 def _get_firebase_credentials():
-    # Try to load from FIREBASE_CREDENTIALS env var (JSON string)
     firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS")
     if firebase_creds_json:
         try:
@@ -23,17 +22,6 @@ def _get_firebase_credentials():
             return credentials.Certificate(creds_dict)
         except json.JSONDecodeError as e:
             print(f"Error parsing FIREBASE_CREDENTIALS: {e}")
-    
-    # Try to load from file path
-    firebase_key_path = os.getenv("FIREBASE_KEY_PATH")
-    
-    possible_paths = os.path.join(os.path.dirname(__file__), "..", "key", "firebase_key.json"),  # Local dev
-
-    
-    # Find the first existing path
-    for path in possible_paths:
-        if path and os.path.exists(path):
-            return credentials.Certificate(path)
     
     return None
 
@@ -47,8 +35,7 @@ def _initialize_firebase():
     cred = _get_firebase_credentials()
     
     if not cred:
-        print("Firebase key not found. Some features may not work.")
-        print("Set FIREBASE_CREDENTIALS or FIREBASE_KEY_PATH env var.")
+        print("Firebase key not found. Set FIREBASE_CREDENTIALS env var.")
         _initialized = True
         return
     

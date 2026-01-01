@@ -16,7 +16,6 @@ class PodcastService:
     def __init__(self):
         """Initialize TTS client with speech credentials"""
         try:
-            # Try to load from SPEECH_CREDENTIALS env var (JSON string)
             speech_creds_json = os.getenv("SPEECH_CREDENTIALS")
             if speech_creds_json:
                 try:
@@ -27,27 +26,8 @@ class PodcastService:
                     return
                 except json.JSONDecodeError as e:
                     print(f"[WARN] Error parsing SPEECH_CREDENTIALS: {e}")
-            
-            # Try to load from file path
-            speech_key_path = os.getenv("SPEECH_KEY_PATH")
-            
-            if not speech_key_path:
-                # Try multiple fallback paths
-                possible_paths = [
-                    "/etc/secret_files/speech_key.json",
-                    os.path.join(os.path.dirname(__file__), "..", "key", "speech_key.json")
-                ]
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        speech_key_path = path
-                        break
-            
-            if speech_key_path and os.path.exists(speech_key_path):
-                credentials = service_account.Credentials.from_service_account_file(speech_key_path)
-                self.tts_client = texttospeech.TextToSpeechClient(credentials=credentials)
-                print("[OK] TTS initialized successfully")
             else:
-                print("[WARN] TTS features disabled.")
+                print("[WARN] TTS features disabled. Set SPEECH_CREDENTIALS env var.")
                 self.tts_client = None
         except Exception as e:
             print(f"[WARN] Could not initialize TTS client: {e}")
