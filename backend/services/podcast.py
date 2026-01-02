@@ -14,7 +14,6 @@ from google.oauth2 import service_account
 
 class PodcastService:
     def __init__(self):
-        """Initialize TTS client with speech credentials"""
         try:
             speech_creds_json = os.getenv("SPEECH_CREDENTIALS")
             if speech_creds_json:
@@ -22,12 +21,12 @@ class PodcastService:
                     creds_dict = json.loads(speech_creds_json)
                     credentials = service_account.Credentials.from_service_account_info(creds_dict)
                     self.tts_client = texttospeech.TextToSpeechClient(credentials=credentials)
-                    print("[OK] TTS client initialized from SPEECH_CREDENTIALS env var")
+                    print("[OK] TTS client initialized successfully.")
                     return
                 except json.JSONDecodeError as e:
                     print(f"[WARN] Error parsing SPEECH_CREDENTIALS: {e}")
             else:
-                print("[WARN] TTS features disabled. Set SPEECH_CREDENTIALS env var.")
+                print("[WARN] TTS features disabled.")
                 self.tts_client = None
         except Exception as e:
             print(f"[WARN] Could not initialize TTS client: {e}")

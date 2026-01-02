@@ -82,20 +82,16 @@ Before you begin, ensure you have the following installed:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/pocket-atlas.git
+git https://github.com/ttphat-fitus/PocketAtlas
 cd pocket-atlas
 ```
 
 ### Step 2: Configure API Keys
-
+<details>
+<summary><b>Click to expand API key setup</b></summary>
 Pocket Atlas requires several API keys to function. Don't worry—most have generous free tiers!
 
-1. **Copy the environment template:**
-   ```bash
-   cp .env.example .env
-   ```
-
-2. **Open `.env` in your favorite editor and fill in the required keys:**
+1. **Open `.env` in your favorite editor and fill in the required keys:**
 
    | Service | Why We Need It | Get Your Key |
    |---------|----------------|--------------|
@@ -104,7 +100,7 @@ Pocket Atlas requires several API keys to function. Don't worry—most have gene
    | **Firebase** | User authentication & data storage | [Setup Guide](https://firebase.google.com/docs/web/setup) |
    | **Unsplash** | Beautiful travel photos | [Get Key](https://unsplash.com/developers) |
 
-3. **Firebase Setup** (Most Important!)
+2. **Firebase Setup** (Most Important!)
 
    Firebase requires two sets of credentials:
    
@@ -119,22 +115,14 @@ Pocket Atlas requires several API keys to function. Don't worry—most have gene
    ```
 
    **Backend (Private):** Download your service account JSON from Firebase Console > Project Settings > Service Accounts > Generate New Private Key
-   
-   Then either:
-   - Convert to single-line JSON and paste in `.env`:
-     ```bash
-     cat firebase_key.json | jq -c
-     ```
-     Copy the output to `FIREBASE_CREDENTIALS` in `.env`
-   
-   - OR place the `firebase_key.json` file in `backend/key/` directory
+</details>
 
 ### Step 3: Launch with Docker
 
 Run this single command to build and start the entire application:
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 **What's happening?**
@@ -215,8 +203,6 @@ Access at http://localhost:3000
 
 <!-- ## Screenshots
 
-> *(Add your screenshots here)*
-
 | Feature | Preview |
 |---------|---------|
 | **AI Trip Planning** | ![Trip Planning](https://via.placeholder.com/600x300?text=Add+Your+Screenshot) |
@@ -241,11 +227,11 @@ pocket-atlas/
 │   ├── models/           # Pydantic schemas
 │   ├── firebase/         # Authentication middleware
 │   └── core/             # Configuration & database
-└── docker-compose.yml    # Multi-container orchestration
+└── docker compose.yml    # Multi-container orchestration
 ```
 
 ---
-<!-- ## 📄 License
+<!-- ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
@@ -258,7 +244,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Ensure Docker has at least 4GB RAM allocated
 - Clear Docker cache: `docker system prune -a`
-- Rebuild: `docker-compose up --build --force-recreate`
+- Rebuild: `docker compose up --build --force-recreate`
 
 </details>
 
@@ -268,7 +254,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Verify all keys are on a single line in `.env` (no line breaks)
 - Check for extra spaces before/after the `=` sign
 - Ensure Firebase credentials are valid JSON
-- Restart containers: `docker-compose restart`
+- Restart containers: `docker compose restart`
 
 </details>
 
@@ -276,7 +262,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <summary><b>Frontend can't connect to backend</b></summary>
 
 - Verify `NEXT_PUBLIC_API_URL=http://localhost:8000` in `.env`
-- Check backend is running: `docker-compose logs backend`
+- Check backend is running: `docker compose logs backend`
 - Ensure both containers are on the same network
 
 </details>

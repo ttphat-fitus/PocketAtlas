@@ -70,8 +70,8 @@ export default function AuthPage() {
             </svg>
             <span className="text-sm">
               {language === "en" 
-                ? "Firebase is not configured. Please check .env.local and FIREBASE_SETUP.md"
-                : "Firebase chưa được cấu hình. Vui lòng kiểm tra .env.local và FIREBASE_SETUP.md"}
+                ? "Firebase is not configured."
+                : "Firebase chưa được cấu hình."}
             </span>
           </div>
         )}

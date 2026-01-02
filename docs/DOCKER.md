@@ -27,7 +27,7 @@ Multi-stage build for FastAPI Python application:
 - **Health Check**: Built-in endpoint monitoring
 - **Size**: ~150MB
 
-### 3. `docker-compose.yml`
+### 3. `docker compose.yml`
 Orchestrates both services:
 - Automatic dependency management (frontend waits for backend)
 - Environment variable injection
@@ -73,7 +73,7 @@ Template for all required environment variables with:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/pocket-atlas.git
+git clone https://github.com/ttphat-fitus/PocketAtlas
 cd pocket-atlas
 ```
 
@@ -132,7 +132,6 @@ Weather data is retrieved through Google Maps Platform Weather API, which uses t
    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-app.appspot.com
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789
    NEXT_PUBLIC_FIREBASE_APP_ID=1:123456789:web:xxxxx
-   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
    ```
 
 **Backend Configuration (Private):**
@@ -190,7 +189,7 @@ Weather data is retrieved through Google Maps Platform Weather API, which uses t
 #### Single Command Launch
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 This command will:
@@ -202,12 +201,12 @@ This command will:
 #### Detached Mode (Background)
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 View logs:
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ### 4. Verify Installation
@@ -215,7 +214,7 @@ docker-compose logs -f
 #### Check Container Status
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 Expected output:
@@ -251,48 +250,48 @@ Open http://localhost:3000 in your browser
 
 ### Start Services
 ```bash
-docker-compose up
+docker compose up
 ```
 
 ### Stop Services
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ### Rebuild After Code Changes
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 ### View Logs
 ```bash
 # All services
-docker-compose logs -f
+docker compose logs -f
 
 # Specific service
-docker-compose logs -f backend
-docker-compose logs -f frontend
+docker compose logs -f backend
+docker compose logs -f frontend
 ```
 
 ### Execute Commands in Container
 ```bash
 # Backend shell
-docker-compose exec backend bash
+docker compose exec backend bash
 
 # Frontend shell
-docker-compose exec frontend sh
+docker compose exec frontend sh
 
 # Run backend migrations (if needed)
-docker-compose exec backend python manage.py migrate
+docker compose exec backend python manage.py migrate
 ```
 
 ### Clean Everything (Reset)
 ```bash
 # Stop and remove containers, networks, volumes
-docker-compose down -v
+docker compose down -v
 
 # Remove images
-docker-compose down --rmi all
+docker compose down --rmi all
 
 # Clean Docker cache
 docker system prune -a
@@ -318,9 +317,9 @@ docker system prune -a --volumes
 - "Failed to fetch" errors
 
 **Solutions:**
-1. Check backend is running: `docker-compose logs backend`
+1. Check backend is running: `docker compose logs backend`
 2. Verify `NEXT_PUBLIC_API_URL=http://localhost:8000` in `.env`
-3. Restart containers: `docker-compose restart`
+3. Restart containers: `docker compose restart`
 4. Check network: `docker network inspect pocketatlas_pocketatlas-network`
 
 ### Issue: Firebase Authentication Fails
@@ -356,7 +355,7 @@ docker system prune -a --volumes
 **Solutions:**
 1. Verify `GEMINI_API_KEY` in `.env`
 2. Check quota: [Google AI Studio](https://makersuite.google.com/)
-3. Review backend logs: `docker-compose logs backend | grep -i gemini`
+3. Review backend logs: `docker compose logs backend | grep -i gemini`
 4. Ensure internet connectivity from container
 
 ### Issue: Port Already in Use
@@ -376,7 +375,7 @@ lsof -i :3000
 kill -9 <PID>
 ```
 
-**Option 2**: Change ports in `docker-compose.yml`
+**Option 2**: Change ports in `docker compose.yml`
 ```yaml
 frontend:
   ports:
@@ -400,7 +399,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8001
 **Solutions:**
 1. Verify `.env` file exists in project root (not `.env.example`)
 2. Check for spaces around `=`: `KEY=value` not `KEY = value`
-3. Restart containers: `docker-compose down && docker-compose up`
+3. Restart containers: `docker compose down && docker compose up`
 4. Verify line endings (LF not CRLF): `dos2unix .env` (Linux/Mac)
 
 ## Production Deployment
@@ -409,7 +408,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8001
 
 ```bash
 # Build with production tags
-docker-compose -f docker-compose.prod.yml build
+docker compose -f docker compose.prod.yml build
 
 # Push to registry
 docker tag pocketatlas-frontend:latest yourregistry/pocketatlas-frontend:v1.0
@@ -467,7 +466,7 @@ RUN npm ci
 
 Use different compose files:
 
-**docker-compose.dev.yml** (hot reload, source maps):
+**docker compose.dev.yml** (hot reload, source maps):
 ```yaml
 frontend:
   command: npm run dev
@@ -475,7 +474,7 @@ frontend:
     - ./frontend:/app
 ```
 
-**docker-compose.prod.yml** (optimized, no volumes):
+**docker compose.prod.yml** (optimized, no volumes):
 ```yaml
 frontend:
   command: node server.js
@@ -497,10 +496,10 @@ jobs:
       - uses: actions/checkout@v3
       
       - name: Build Docker images
-        run: docker-compose build
+        run: docker compose build
       
       - name: Run containers
-        run: docker-compose up -d
+        run: docker compose up -d
       
       - name: Wait for health checks
         run: |
@@ -508,7 +507,7 @@ jobs:
           timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
       
       - name: Run tests
-        run: docker-compose exec -T backend pytest
+        run: docker compose exec -T backend pytest
 ```
 
 

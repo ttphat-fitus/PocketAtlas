@@ -18,7 +18,6 @@ def _get_firebase_credentials():
     if firebase_creds_json:
         try:
             creds_dict = json.loads(firebase_creds_json)
-            print("Firebase credentials loaded from FIREBASE_CREDENTIALS env var")
             return credentials.Certificate(creds_dict)
         except json.JSONDecodeError as e:
             print(f"Error parsing FIREBASE_CREDENTIALS: {e}")
@@ -35,14 +34,14 @@ def _initialize_firebase():
     cred = _get_firebase_credentials()
     
     if not cred:
-        print("Firebase key not found. Set FIREBASE_CREDENTIALS env var.")
+        print("Firebase key not found.")
         _initialized = True
         return
     
     try:
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred)
-        print("[OK] Firebase initialized successfully")
+        print("[OK] Firebase initialized successfully.")
         _initialized = True
     except Exception as e:
         print(f"Error initializing Firebase: {e}")

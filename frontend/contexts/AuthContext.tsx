@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     if (!isConfigured) {
-      throw new Error("Firebase is not configured. Please check your .env.local file.");
+      throw new Error("Firebase is not configured.");
     }
     const result = await signInWithEmailAndPassword(auth, email, password);
     return result.user;
@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, displayName?: string) => {
     if (!isConfigured) {
-      throw new Error("Firebase is not configured. Please check your .env.local file.");
+      throw new Error("Firebase is not configured.");
     }
     const result = await createUserWithEmailAndPassword(auth, email, password);
     
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInAnon = async () => {
     if (!isConfigured) {
-      throw new Error("Firebase is not configured. Please check your .env.local file.");
+      throw new Error("Firebase is not configured.");
     }
     const result = await signInAnonymously(auth);
     return result.user;
@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     if (!isConfigured) {
-      throw new Error("Firebase is not configured. Please check your .env.local file.");
+      throw new Error("Firebase is not configured.");
     }
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     if (!isConfigured) {
-      throw new Error("Firebase is not configured. Please check your .env.local file.");
+      throw new Error("Firebase is not configured.");
     }
     await firebaseSignOut(auth);
   };
