@@ -5,7 +5,7 @@ from typing import Optional
 
 class TripRequest(BaseModel):
     destination: str
-    duration: int = Field(..., ge=1, le=3)
+    duration: int = Field(..., ge=1, le=7)
     budget: str
     start_date: str
     preferences: Optional[str] = ""
