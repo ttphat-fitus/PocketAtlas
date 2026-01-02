@@ -13,9 +13,9 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       # API Keys from .env
+      - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
       - WEATHER_API_KEY=${WEATHER_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY}
       # Firebase credentials as JSON strings
       - FIREBASE_CREDENTIALS=${FIREBASE_CREDENTIALS}

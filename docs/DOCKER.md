@@ -114,7 +114,7 @@ Weather data is retrieved through Google Maps Platform Weather API, which uses t
 2. Create an API key
 3. Add to `.env`:
    ```env
-   GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+   GOOGLE_GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
    ```
 
 #### E. Configure Firebase (Most Complex)
