@@ -75,7 +75,7 @@ Forget generic itineraries. Our AI-powered engine creates trips that match YOUR 
 
 ### Prerequisites
 
-Before you begin, ensure you have the following installed:
+Before you begin, ensure you have the following installed and [Docker Setup](docs/DOCKER.md) documentation:
 - **Docker** (version 20.10+): [Install Docker](https://docs.docker.com/get-docker/)
 - **Docker Compose** (version 2.0+): Usually included with Docker Desktop
 
@@ -83,10 +83,13 @@ Before you begin, ensure you have the following installed:
 
 ```bash
 git https://github.com/ttphat-fitus/PocketAtlas
-cd pocket-atlas
+cd PocketAtlas
 ```
 
 ### Step 2: Configure API Keys
+
+> Note: All required keys are stored in .env and .env.text in project submission in Moodle. So just drap & drop the .env file to the root directory of the project.
+
 <details>
 <summary><b>Click to expand API key setup</b></summary>
 Pocket Atlas requires several API keys to function. Don't worry—most have generous free tiers!
@@ -98,6 +101,7 @@ Pocket Atlas requires several API keys to function. Don't worry—most have gene
    | **Google Maps API** | Location search, maps, directions, weather forecasts | [Get Key](https://console.cloud.google.com/apis/credentials) |
    | **Google Gemini AI** | AI-powered itinerary generation | [Get Key](https://makersuite.google.com/app/apikey) |
    | **Firebase** | User authentication & data storage | [Setup Guide](https://firebase.google.com/docs/web/setup) |
+   | **Weather API** | Weather forecasts for destinations | [Get Key](https://www.weatherapi.com/docs/) |
    | **Unsplash** | Beautiful travel photos | [Get Key](https://unsplash.com/developers) |
 
 2. **Firebase Setup** (Most Important!)
@@ -201,21 +205,10 @@ Access at http://localhost:3000
 
 ---
 
-<!-- ## Screenshots
-
-| Feature | Preview |
-|---------|---------|
-| **AI Trip Planning** | ![Trip Planning](https://via.placeholder.com/600x300?text=Add+Your+Screenshot) |
-| **Interactive Maps** | ![Maps](https://via.placeholder.com/600x300?text=Add+Your+Screenshot) |
-| **Community Discovery** | ![Explore](https://via.placeholder.com/600x300?text=Add+Your+Screenshot) |
-| **Gamification Dashboard** | ![Profile](https://via.placeholder.com/600x300?text=Add+Your+Screenshot) |
-
---- -->
-
 ## Project Structure
 
 ```
-pocket-atlas/
+PocketAtlas/
 ├── frontend/              # Next.js application
 │   ├── app/              # App router pages & API routes
 │   ├── components/       # Reusable React components
@@ -227,15 +220,11 @@ pocket-atlas/
 │   ├── models/           # Pydantic schemas
 │   ├── firebase/         # Authentication middleware
 │   └── core/             # Configuration & database
-└── docker compose.yml    # Multi-container orchestration
+├── docker compose.yml    # Multi-container orchestration
+└── .env
 ```
 
 ---
-<!-- ## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
---- -->
 
 ## Troubleshooting
 

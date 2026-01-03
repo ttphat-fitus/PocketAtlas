@@ -74,7 +74,7 @@ Template for all required environment variables with:
 
 ```bash
 git clone https://github.com/ttphat-fitus/PocketAtlas
-cd pocket-atlas
+cd PocketAtlas
 ```
 
 ### 2. Environment Configuration
