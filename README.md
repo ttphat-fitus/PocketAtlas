@@ -88,7 +88,7 @@ cd PocketAtlas
 
 ### Step 2: Configure API Keys
 
-> Note: All required keys are stored in .env and .env.text in project submission in Moodle. So just drap & drop the .env file to the root directory of the project.
+> Note: All required keys are stored in .env and env.text in project submission in Moodle. So just drap & drop the .env file to the root directory of the project.
 
 <details>
 <summary><b>Click to expand API key setup</b></summary>
