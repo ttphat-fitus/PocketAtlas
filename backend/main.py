@@ -26,10 +26,9 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 # Define allowed origins based on environment
 allowed_origins = [
     "http://localhost:3000",  # Local development
-    "http://localhost:3001",  # Alternative local port
     "http://127.0.0.1:3000",  # Local IP
     "https://pocketatlas.vercel.app",  # Main Vercel production
-    "http://34.142.227.210:3000",  # GCP frontend (if running on same instance)
+    "https://pocketatlas.studev.id.vn/",  # GCP frontend 
 ]
 
 # Add production URLs if configured
